@@ -359,7 +359,7 @@ button {
 }
 
 .workspace {
-    min-height: 540px;
+    min-height: 0;
 }
 
 .tab-panel {
