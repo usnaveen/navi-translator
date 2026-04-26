@@ -20,11 +20,15 @@ env/
 mlruns/
 mlartifacts/
 
-# Models
+# Models (weights too large for git — use DVC or HuggingFace Hub)
+models/
 *.pt
 *.bin
 *.safetensors
 *.onnx
+
+# Logs
+*.log
 
 # Docker
 .docker/

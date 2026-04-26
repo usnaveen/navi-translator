@@ -78,9 +78,13 @@ def load_audio_dataset(split_dir: Path, audio_dir: Path, sr: int) -> Dataset:
         if not filepath.exists():
             continue
 
-        stem = filepath.stem
-        # Find the Na'vi word this audio corresponds to
-        transcription = word_map.get(stem.lower(), stem)
+        # Prefer the manifest's own 'navi' label (set by reykunyu_audio.py).
+        # Fall back to filename-stem lookup for legacy gTTS-era files.
+        if item.get("navi"):
+            transcription = item["navi"]
+        else:
+            stem = filepath.stem
+            transcription = word_map.get(stem.lower(), stem)
 
         try:
             audio, _ = librosa.load(str(filepath), sr=sr, mono=True)
@@ -259,21 +263,19 @@ def main():
         training_args = Seq2SeqTrainingArguments(
             output_dir=str(output_dir),
             per_device_train_batch_size=whisper_params["batch_size"],
-            per_device_eval_batch_size=whisper_params["batch_size"],
-            gradient_accumulation_steps=4,        # effective batch 4 with ~1/4 the memory
-            gradient_checkpointing=True,          # trade compute for memory
+            per_device_eval_batch_size=4,          # larger eval batch — no grad needed
+            gradient_accumulation_steps=4,         # effective batch 4 with ~1/4 the memory
+            gradient_checkpointing=True,           # trade compute for memory
             learning_rate=whisper_params["learning_rate"],
             warmup_steps=whisper_params["warmup_steps"],
             num_train_epochs=whisper_params["num_epochs"],
-            eval_strategy="steps",
-            eval_steps=whisper_params["eval_steps"],
-            save_strategy="steps",
-            save_steps=whisper_params["eval_steps"],
+            eval_strategy="epoch",       # eval once per epoch, not every 200 steps
+            save_strategy="epoch",
             save_total_limit=2,          # keep only best + latest checkpoint (saves disk)
             load_best_model_at_end=True,
             metric_for_best_model="wer",
             greater_is_better=False,
-            predict_with_generate=True,
+            predict_with_generate=False,  # skip beam search during eval to avoid OOM + slow evals
             generation_max_length=225,
             logging_steps=25,
             report_to=["mlflow"],
