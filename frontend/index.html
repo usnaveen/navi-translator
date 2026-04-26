@@ -3,50 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Na'vi Translator</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 50%, #0d3b2e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-        }
-        h1 {
-            font-size: 2.5rem;
-            color: #00d4ff;
-            margin-bottom: 0.5rem;
-        }
-        .subtitle {
-            font-size: 1.1rem;
-            color: #7eb8c9;
-            margin-bottom: 2rem;
-        }
-        .status {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(0,212,255,0.2);
-            border-radius: 12px;
-            padding: 1.5rem 2rem;
-            display: inline-block;
-        }
-        .status p { color: #a0c4d0; }
-    </style>
+    <title>Na'vi Translator — Eywa ngahu</title>
+    <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Na'vi Translator</h1>
-        <p class="subtitle">Eywa ngahu — The Great Mother is with you</p>
-        <div class="status">
-            <p>Application skeleton loaded. Full UI coming in Phase 6.</p>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1>Na'vi Translator</h1>
+            <p class="tagline">Eywa ngahu — The Great Mother is with you</p>
+        </div>
+        <button class="help-btn" onclick="toggleHelp()" title="User Manual">?</button>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+        <button class="tab active" data-tab="audio" onclick="switchTab('audio')">Translate Audio</button>
+        <button class="tab" data-tab="text" onclick="switchTab('text')">Translate Text</button>
+        <button class="tab" data-tab="contribute" onclick="switchTab('contribute')">Contribute</button>
+        <button class="tab" data-tab="pipeline" onclick="switchTab('pipeline')">Pipeline Status</button>
+    </nav>
+
+    <!-- Tab Content -->
+    <main class="content">
+
+        <!-- Audio Translation Tab -->
+        <section id="tab-audio" class="tab-panel active">
+            <div class="card">
+                <h2>Audio Translation</h2>
+                <p class="description">Record Na'vi speech or upload an audio file to translate to English.</p>
+
+                <div class="audio-controls">
+                    <button id="record-btn" class="btn btn-primary btn-large" onclick="toggleRecording()">
+                        <span id="record-icon">🎤</span>
+                        <span id="record-label">Start Recording</span>
+                    </button>
+                    <div id="recording-indicator" class="recording-indicator hidden">
+                        <span class="pulse"></span> Recording...
+                    </div>
+                </div>
+
+                <div class="divider">or</div>
+
+                <div class="upload-area" id="upload-area">
+                    <input type="file" id="audio-file" accept="audio/*" onchange="handleAudioUpload(event)" hidden>
+                    <button class="btn btn-secondary" onclick="document.getElementById('audio-file').click()">
+                        Upload Audio File
+                    </button>
+                    <p class="hint">WAV, MP3, or OGG — max 30 seconds</p>
+                </div>
+
+                <div id="audio-result" class="result-box hidden">
+                    <h3>Translation Result</h3>
+                    <div class="result-row">
+                        <label>Na'vi (transcribed):</label>
+                        <span id="audio-navi" class="result-value"></span>
+                    </div>
+                    <div class="result-row">
+                        <label>English:</label>
+                        <span id="audio-english" class="result-value highlight"></span>
+                    </div>
+                    <div class="result-meta">
+                        <span>Confidence: <strong id="audio-confidence"></strong></span>
+                        <span>Latency: <strong id="audio-latency"></strong>ms</span>
+                    </div>
+                </div>
+
+                <div id="audio-error" class="error-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- Text Translation Tab -->
+        <section id="tab-text" class="tab-panel">
+            <div class="card">
+                <h2>Text Translation</h2>
+                <p class="description">Type Na'vi text to translate to English with word-by-word breakdown.</p>
+
+                <div class="input-group">
+                    <textarea id="navi-input" placeholder="Type Na'vi text here... e.g. kaltxì" rows="3" maxlength="500"></textarea>
+                    <button class="btn btn-primary" onclick="translateText()">Translate</button>
+                </div>
+
+                <div id="text-result" class="result-box hidden">
+                    <h3>Translation</h3>
+                    <div class="result-row">
+                        <label>English:</label>
+                        <span id="text-english" class="result-value highlight"></span>
+                    </div>
+                    <div class="result-meta">
+                        <span>Confidence: <strong id="text-confidence"></strong></span>
+                        <span>Latency: <strong id="text-latency"></strong>ms</span>
+                    </div>
+
+                    <h3>Word Breakdown</h3>
+                    <div id="word-breakdown" class="breakdown-grid"></div>
+                </div>
+
+                <div id="text-error" class="error-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- Contribute Tab -->
+        <section id="tab-contribute" class="tab-panel">
+            <div class="card">
+                <h2>Contribute a Word</h2>
+                <p class="description">Help grow the Na'vi dictionary by submitting new words with optional audio.</p>
+
+                <form id="contribute-form" onsubmit="submitVocab(event)">
+                    <div class="form-group">
+                        <label for="contrib-navi">Na'vi Word</label>
+                        <input type="text" id="contrib-navi" placeholder="e.g. fya'o" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="contrib-en">English Meaning</label>
+                        <input type="text" id="contrib-en" placeholder="e.g. path, way" required maxlength="200">
+                    </div>
+                    <div class="form-group">
+                        <label>Audio (optional)</label>
+                        <button type="button" class="btn btn-secondary btn-small" id="contrib-record-btn" onclick="toggleContribRecording()">
+                            Record Pronunciation
+                        </button>
+                        <span id="contrib-audio-status" class="hint"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Word</button>
+                </form>
+
+                <div id="contrib-result" class="result-box hidden"></div>
+                <div id="contrib-error" class="error-box hidden"></div>
+            </div>
+        </section>
+
+        <!-- Pipeline Status Tab -->
+        <section id="tab-pipeline" class="tab-panel">
+            <div class="card">
+                <h2>Pipeline Status</h2>
+                <p class="description">Monitor the MLOps pipeline, experiment tracking, and system health.</p>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>API Health</h3>
+                        <div id="health-status" class="status-value">Checking...</div>
+                        <div id="health-details" class="status-details"></div>
+                    </div>
+                    <div class="status-card">
+                        <h3>Model Readiness</h3>
+                        <div id="ready-status" class="status-value">Checking...</div>
+                        <div id="ready-details" class="status-details"></div>
+                    </div>
+                </div>
+
+                <div class="pipeline-links">
+                    <h3>Management Consoles</h3>
+                    <div class="link-grid">
+                        <a href="http://localhost:5000" target="_blank" class="pipeline-link">
+                            <strong>MLflow</strong>
+                            <span>Experiment tracking & model registry</span>
+                        </a>
+                        <a href="http://localhost:8080" target="_blank" class="pipeline-link">
+                            <strong>Airflow</strong>
+                            <span>Pipeline orchestration & DAG runs</span>
+                        </a>
+                        <a href="http://localhost:9090" target="_blank" class="pipeline-link">
+                            <strong>Prometheus</strong>
+                            <span>Metrics & alert rules</span>
+                        </a>
+                        <a href="http://localhost:3001" target="_blank" class="pipeline-link">
+                            <strong>Grafana</strong>
+                            <span>Dashboards & visualization</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="toggleHelp()">&times;</button>
+            <h2>User Manual</h2>
+
+            <h3>Translate Audio</h3>
+            <p>Click <strong>Start Recording</strong> and speak a Na'vi word or phrase.
+               Click <strong>Stop Recording</strong> when done. The system transcribes
+               your speech and translates it to English.</p>
+            <p>You can also upload a pre-recorded audio file (WAV, MP3, or OGG, max 30 seconds).</p>
+
+            <h3>Translate Text</h3>
+            <p>Type any Na'vi text in the text box and click <strong>Translate</strong>.
+               You'll get the English translation plus a word-by-word breakdown showing
+               which words were found in the dictionary.</p>
+
+            <h3>Contribute</h3>
+            <p>Help improve the translator by submitting new Na'vi words. Enter the
+               Na'vi word, its English meaning, and optionally record the pronunciation.
+               Submissions are reviewed before being added to the training data.</p>
+
+            <h3>Pipeline Status</h3>
+            <p>View the health of the API, model loading status, and links to the
+               management consoles (MLflow, Airflow, Prometheus, Grafana).</p>
+
+            <h3>About</h3>
+            <p>Na'vi Translator is an MLOps project for DA6360. It uses Whisper for
+               speech recognition and MarianMT for translation, with automated
+               retraining when data drift is detected.</p>
         </div>
     </div>
+
+    <script src="static/app.js"></script>
 </body>
 </html>
