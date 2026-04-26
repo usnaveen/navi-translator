@@ -226,9 +226,16 @@ class TranslationEngine:
         if confidence < threshold or not self.marian_loaded:
             english_fb, breakdown = self._translate_with_dictionary(navi_text)
             word_breakdown = breakdown
-            if confidence < threshold:
+            found_count = sum(1 for b in breakdown if b["found"])
+            # Only override the neural output if the dictionary actually
+            # resolved at least one word. Otherwise the MarianMT output
+            # (even if low-confidence) is more useful than a string of
+            # [bracketed] echoes of the input.
+            if found_count > 0 and (confidence < threshold or not self.marian_loaded):
                 english = english_fb
-                confidence = 0.3  # dictionary lookup confidence
+                confidence = max(confidence, 0.3 * (found_count / len(breakdown)))
+            elif not english:
+                english = navi_text  # last-resort echo so the field is never empty
 
         return english, round(confidence, 3), word_breakdown
 
@@ -259,6 +266,27 @@ class TranslationEngine:
 
         return translation, confidence
 
+    # Na'vi case suffixes (agentive, patientive, dative, genitive, topical)
+    # and common verb suffixes — longest first so greediest match wins
+    _NAVI_SUFFIXES = [
+        "ìyevìng", "iyevìng", "äpeyk", "eyng", "eiyä",
+        "ìlä", "tìng", "sìyä", "isyä",
+        "ìri", "ìru", "ìti", "äng", "eie", "ang",
+        "yä", "ri", "ru", "ti", "it", "ur", "l",
+    ]
+
+    def _strip_navi_suffix(self, word: str) -> str:
+        """Return longest suffix-stripped form that exists in the dictionary."""
+        low = word.lower()
+        if low in self.word_lookup:
+            return low
+        for suffix in self._NAVI_SUFFIXES:
+            if low.endswith(suffix) and len(low) - len(suffix) >= 2:
+                stem = low[: -len(suffix)]
+                if stem in self.word_lookup:
+                    return stem
+        return low
+
     def _translate_with_dictionary(self, text: str) -> tuple[str, list[dict]]:
         """Fallback: word-by-word dictionary lookup via Reykunyu."""
         tokens = text.strip().split()
@@ -266,13 +294,14 @@ class TranslationEngine:
         breakdown = []
 
         for token in tokens:
-            en = self.word_lookup.get(token.lower(), f"[{token}]")
+            key = self._strip_navi_suffix(token)
+            en = self.word_lookup.get(key, f"[{token}]")
             first_meaning = en.split(";")[0].strip() if ";" in en else en
             translations.append(first_meaning)
             breakdown.append({
                 "navi": token,
                 "en": first_meaning,
-                "found": token.lower() in self.word_lookup,
+                "found": key in self.word_lookup,
             })
 
         return " ".join(translations), breakdown
