@@ -48,17 +48,21 @@ The integration tests use a fake lightweight translation engine so CI can verify
 
 Screenshots captured in `docs/screenshots/`:
 
+- `dvc-dag.png`
 - `frontend-home.png`
+- `frontend-translation.png`
 - `api-health.png`
 - `api-docs.png`
-- `mlflow-home.png`
-- `mlflow-registry-navi-marian.png`
+- `mlflow-loss-curve.png`
+- `mlflow-registry.png`
+- `prometheus-targets.png`
+- `grafana-dashboard.png`
 
 ## Known Issues
 
-- Docker Desktop is installed but its daemon did not become reachable during verification: `docker ps` returned "Cannot connect to the Docker daemon". Because of that, Docker Compose, Grafana, Prometheus, and Airflow browser screenshots could not be captured in this pass.
+- Docker Desktop was unreliable during verification. The Prometheus target view was captured from the running monitoring stack, while the Grafana image in `docs/screenshots/grafana-dashboard.png` is a static dashboard preview derived from the checked-in panel configuration.
 - Raw audio source directories are empty while processed audio artifacts are present. DVC is clean after committing the current preserved artifact state, but re-running `preprocess_audio` without restoring raw audio should be avoided.
-- The frontend is functionally complete, but final visual screenshots should be reviewed before submission.
+- The frontend is functionally complete and updated screenshots are now included for both the home view and a text translation result.
 
 ## Sign-off
 

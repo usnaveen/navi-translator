@@ -86,8 +86,15 @@
 }
 
 % ── Real image command ────────────────────────────────────────────────────────
-% Replace \imgplaceholder with \img once you have the screenshots:
-% \newcommand{\img}[4]{\begin{figure}[H]\centering\includegraphics[width=#1]{screenshots/#3}\caption{#4}\label{fig:#3}\end{figure}}
+% Usage: \img{width}{path}{label}{caption}
+\newcommand{\img}[4]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#1]{#2}
+    \caption{#4}
+    \label{fig:#3}
+  \end{figure}%
+}
 
 % ──────────────────────────────────────────────────────────────────────────────
 \begin{document}
@@ -264,8 +271,8 @@ only what is necessary.
 \end{itemize}
 
 % ── IMAGE 1: DVC DAG ──────────────────────────────────────────────────────────
-\imgplaceholder{0.6\textwidth}{5cm}{dvc-dag}%
-  {DVC pipeline DAG --- run \texttt{dvc dag} in the project root to reproduce}
+\img{0.85\textwidth}{screenshots/dvc-dag.png}{dvc-dag}
+  {DVC pipeline DAG showing ingest, preprocessing, split, and baseline stages}
 
 \subsection{Source Control and Continuous Integration}
 
@@ -301,16 +308,12 @@ Every training run is tracked in MLflow with full parameter, metric, and artifac
   \end{tabular}
 \end{table}
 
-% ── IMAGE 2: MLflow runs list ─────────────────────────────────────────────────
-\imgplaceholder{\textwidth}{6cm}{mlflow-runs}%
-  {MLflow experiment view showing all training runs with loss metrics}
-
 % ── IMAGE 3: MLflow loss curve ────────────────────────────────────────────────
-\imgplaceholder{\textwidth}{6cm}{mlflow-loss-curve}%
+\img{\textwidth}{screenshots/mlflow-loss-curve.png}{mlflow-loss-curve}
   {Training loss curve from the final whisper-tiny run (loss: 5.12 $\rightarrow$ 0.86)}
 
 % ── IMAGE 4: MLflow model registry ───────────────────────────────────────────
-\imgplaceholder{0.8\textwidth}{5cm}{mlflow-registry}%
+\img{0.8\textwidth}{screenshots/mlflow-registry.png}{mlflow-registry}
   {MLflow Model Registry showing navi-whisper and navi-marian in Production stage}
 
 \subsection{Exporter Instrumentation and Visualization}
@@ -345,12 +348,12 @@ in near-real-time.
   \item \texttt{HighLatency} --- p95 latency $>$ 5,000\,ms over 5 minutes, severity warning
 \end{itemize}
 
-% ── IMAGE 5: Grafana dashboard ────────────────────────────────────────────────
-\imgplaceholder{\textwidth}{6cm}{grafana-dashboard}%
-  {Grafana dashboard showing inference latency, OOV rate, and request volume in near-real-time}
+% ── IMAGE 5: Grafana dashboard preview ───────────────────────────────────────
+\img{0.42\textwidth}{screenshots/grafana-dashboard.png}{grafana-dashboard}
+  {Grafana-style dashboard preview derived from the checked-in panel configuration for request volume, latency, OOV rate, and model version monitoring}
 
 % ── IMAGE 6: Prometheus targets ───────────────────────────────────────────────
-\imgplaceholder{0.8\textwidth}{4cm}{prometheus-targets}%
+\img{0.8\textwidth}{screenshots/prometheus-targets.png}{prometheus-targets}
   {Prometheus scrape targets --- backend:8000/metrics showing UP status}
 
 \subsection{Software Packaging}
@@ -456,6 +459,17 @@ Full endpoint specifications including error codes are in \texttt{docs/LLD.md}.
   \end{tabular}
 \end{table}
 
+\subsection{API Documentation and Health Checks}
+
+The FastAPI service also exposes interactive OpenAPI documentation and lightweight
+health endpoints for readiness checks during local deployment.
+
+\img{0.42\textwidth}{screenshots/api-docs.png}{api-docs}
+  {Swagger / OpenAPI documentation view for the Na'vi Translator backend}
+
+\img{0.36\textwidth}{screenshots/api-health.png}{api-health}
+  {Health endpoint response confirming service uptime and model version reporting}
+
 \subsection{Implementation Quality}
 
 \begin{itemize}[leftmargin=1.5em]
@@ -499,11 +513,11 @@ no framework dependencies --- for minimal footprint and easy containerisation.
 \end{itemize}
 
 % ── IMAGE 7: Frontend home ────────────────────────────────────────────────────
-\imgplaceholder{\textwidth}{7cm}{frontend-home}%
+\img{\textwidth}{screenshots/frontend-home.png}{frontend-home}
   {Na'vi Translator web application --- 4-tab UI loaded at \texttt{http://localhost:3000}}
 
 % ── IMAGE 8: Translation result ───────────────────────────────────────────────
-\imgplaceholder{\textwidth}{7cm}{frontend-translation}%
+\img{\textwidth}{screenshots/frontend-translation.png}{frontend-translation}
   {Text translation result for \textit{oel ngati kameie} showing word-level breakdown}
 
 \subsection{MLOps Pipeline Visualization}
