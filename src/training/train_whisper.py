@@ -269,8 +269,10 @@ def main():
             learning_rate=whisper_params["learning_rate"],
             warmup_steps=whisper_params["warmup_steps"],
             num_train_epochs=whisper_params["num_epochs"],
-            eval_strategy="epoch",       # eval once per epoch, not every 200 steps
-            save_strategy="epoch",
+            eval_strategy="steps",       # step-based eval/save so a crash mid-epoch doesn't wipe progress
+            save_strategy="steps",
+            eval_steps=whisper_params["eval_steps"],
+            save_steps=whisper_params["save_steps"],
             save_total_limit=2,          # keep only best + latest checkpoint (saves disk)
             load_best_model_at_end=True,
             metric_for_best_model="wer",

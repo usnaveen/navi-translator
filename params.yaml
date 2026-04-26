@@ -24,17 +24,20 @@ split:
 
 # --- Whisper ASR (Speech-to-Text) ---
 whisper:
-  base_model: "openai/whisper-small"
-  lora_r: 8
-  lora_alpha: 16
+  base_model: "openai/whisper-tiny"   # 39M params; research: tiny/base outperform small/medium with limited fine-tuning data
+  lora_r: 16                           # bumped from 8 — tiny has less capacity, give LoRA more room
+  lora_alpha: 32                       # alpha = 2×r (standard ratio)
   lora_target_modules:
     - "q_proj"
+    - "k_proj"                         # added — broader attention adaptation
     - "v_proj"
+    - "out_proj"                       # added — output projection benefits low-resource fine-tuning
   learning_rate: 1.0e-4
-  batch_size: 1
+  batch_size: 1                        # effective batch = 4 via gradient_accumulation_steps=4
   num_epochs: 5
   warmup_steps: 100
   eval_steps: 200
+  save_steps: 200                      # NEW: checkpoint every 200 steps — crash protection
   early_stopping_patience: 3
   language: "mi"              # Maori — closest Whisper-supported language to Na'vi (Polynesian phonology)
   target_wer: 0.35
