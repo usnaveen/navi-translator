@@ -1,0 +1,51 @@
+# =============================================================================
+# Na'vi Language Translator — Python Dependencies
+# =============================================================================
+
+# --- Core ML ---
+torch>=2.1.0
+transformers>=4.36.0
+peft>=0.7.0              # LoRA adapters for Whisper
+datasets>=2.16.0
+sacrebleu>=2.3.0          # BLEU score computation
+jiwer>=3.0.0              # WER computation
+sentencepiece>=0.1.99     # MarianMT tokenizer
+
+# --- Audio Processing ---
+librosa>=0.10.0
+soundfile>=0.12.0
+torchaudio>=2.1.0
+
+# --- TTS Bootstrap ---
+gTTS>=2.5.0
+
+# --- Data & API ---
+requests>=2.31.0
+pyyaml>=6.0.0
+pandas>=2.1.0
+numpy>=1.26.0
+
+# --- API Serving ---
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6   # file uploads
+pydantic>=2.5.0
+
+# --- MLOps ---
+mlflow>=2.10.0
+dvc>=3.40.0
+apache-airflow>=2.8.0
+great-expectations>=0.18.0
+
+# --- Monitoring ---
+prometheus-client>=0.20.0
+evidently>=0.4.0
+
+# --- Testing ---
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+httpx>=0.26.0             # async test client for FastAPI
+
+# --- Linting ---
+ruff>=0.2.0

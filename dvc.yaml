@@ -1,0 +1,79 @@
+# =============================================================================
+# DVC Pipeline — Na'vi Language Translator
+# =============================================================================
+# Run with: dvc repro
+# Each stage defines its command, dependencies, parameters, and outputs.
+# DVC uses this to build a DAG and only re-runs stages whose inputs changed.
+# =============================================================================
+
+stages:
+  ingest:
+    cmd: python src/ingestion/data_ingest.py
+    deps:
+      - src/ingestion/data_ingest.py
+      - src/ingestion/reykunyu_client.py
+      - src/ingestion/tts_generate.py
+    params:
+      - data.reykunyu_words_url
+      - data.audio_sample_rate
+      - tts.engine
+      - tts.language
+    outs:
+      - data/raw/words.json
+      - data/raw/audio
+      - data/synthetic
+
+  preprocess_text:
+    cmd: python src/preprocessing/build_pairs.py
+    deps:
+      - src/preprocessing/build_pairs.py
+      - data/raw/words.json
+    params:
+      - marian.max_source_length
+      - marian.max_target_length
+    outs:
+      - data/processed/text
+
+  preprocess_audio:
+    cmd: python src/preprocessing/audio_features.py
+    deps:
+      - src/preprocessing/audio_features.py
+      - data/raw/audio
+      - data/synthetic
+    params:
+      - data.audio_sample_rate
+      - data.audio_channels
+      - data.min_audio_duration
+      - data.max_audio_duration
+    outs:
+      - data/processed/audio
+
+  split:
+    cmd: python src/preprocessing/split_data.py
+    deps:
+      - src/preprocessing/split_data.py
+      - data/processed/text
+      - data/processed/audio
+    params:
+      - split.train_ratio
+      - split.val_ratio
+      - split.test_ratio
+      - split.random_seed
+    outs:
+      - data/processed/train
+      - data/processed/val
+      - data/processed/test
+
+  baseline_stats:
+    cmd: python src/preprocessing/baseline_stats.py
+    deps:
+      - src/preprocessing/baseline_stats.py
+      - data/processed/train
+      - data/processed/val
+      - data/raw/words.json
+    metrics:
+      - baselines.json:
+          cache: false
+    plots:
+      - data/processed/baseline_plots:
+          cache: false

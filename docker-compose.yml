@@ -1,0 +1,95 @@
+services:
+  # ---- Backend: FastAPI inference server ----
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: navi-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./mlruns:/app/mlruns
+      - ./mlartifacts:/app/mlartifacts
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PARAMS_FILE=/app/params.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - navi-net
+    depends_on:
+      - mlflow
+
+  # ---- Frontend: Nginx serving static files ----
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: navi-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - navi-net
+    depends_on:
+      - backend
+
+  # ---- MLflow Tracking Server ----
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    container_name: navi-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+      - ./mlartifacts:/mlflow/mlartifacts
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlruns/mlflow.db
+      --default-artifact-root /mlflow/mlartifacts
+    networks:
+      - navi-net
+
+  # ---- Prometheus: Metrics collection ----
+  prometheus:
+    image: prom/prometheus:v2.49.1
+    container_name: navi-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    networks:
+      - navi-net
+    depends_on:
+      - backend
+
+  # ---- Grafana: Dashboards ----
+  grafana:
+    image: grafana/grafana:10.3.1
+    container_name: navi-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/navi_overview.json
+    networks:
+      - navi-net
+    depends_on:
+      - prometheus
+
+networks:
+  navi-net:
+    driver: bridge

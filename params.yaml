@@ -1,0 +1,83 @@
+# =============================================================================
+# Na'vi Language Translator — Hyperparameters & Configuration
+# =============================================================================
+# This file is the single source of truth for all tunable parameters.
+# DVC reads from this file, making every experiment reproducible.
+# =============================================================================
+
+# --- Data Ingestion ---
+data:
+  reykunyu_words_url: "https://raw.githubusercontent.com/Willem3141/navi-reykunyu/main/words.json"
+  audio_sample_rate: 16000
+  audio_channels: 1           # mono
+  min_audio_duration: 0.3     # seconds
+  max_audio_duration: 10.0    # seconds
+  navi_charset: "abcdefghijklmnoprstuvwyzäìABCDEFGHIJKLMNOPRSTUVWYZÄÌ'ʼ "
+
+# --- Data Split ---
+split:
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  random_seed: 42
+  stratify_by: "frequency_tier"
+
+# --- Whisper ASR (Speech-to-Text) ---
+whisper:
+  base_model: "openai/whisper-small"
+  lora_r: 8
+  lora_alpha: 16
+  lora_target_modules:
+    - "q_proj"
+    - "v_proj"
+  learning_rate: 1.0e-4
+  batch_size: 4
+  num_epochs: 5
+  warmup_steps: 100
+  eval_steps: 200
+  early_stopping_patience: 3
+  language: "na"              # Na'vi ISO code approximation
+  target_wer: 0.35
+
+# --- MarianMT NMT (Na'vi → English Translation) ---
+marian:
+  base_model: "Helsinki-NLP/opus-mt-mul-en"
+  learning_rate: 2.0e-5
+  batch_size: 16
+  num_epochs: 10
+  warmup_steps: 50
+  max_source_length: 128
+  max_target_length: 128
+  target_bleu: 0.25
+  fallback_confidence_threshold: 0.4
+
+# --- MLflow ---
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "navi-translator"
+  model_registry_name_whisper: "navi-whisper"
+  model_registry_name_marian: "navi-marian"
+  promotion_threshold_wer: 0.01   # promote if WER improves by this much
+  promotion_threshold_bleu: 0.01  # promote if BLEU improves by this much
+
+# --- Serving ---
+serving:
+  host: "0.0.0.0"
+  port: 8000
+  max_audio_length_seconds: 30
+  request_log_db: "request_log.db"
+
+# --- Monitoring ---
+monitoring:
+  drift_check_interval_hours: 24
+  oov_drift_threshold: 0.15       # 15% increase triggers alert
+  error_rate_alert_threshold: 0.05
+  latency_p95_alert_ms: 5000
+  recent_requests_window: 100
+  drift_reference_requests: 500
+
+# --- TTS Bootstrap ---
+tts:
+  engine: "gtts"                  # gtts or coqui
+  language: "id"                  # closest gTTS language for Na'vi phonetics
+  slow: true

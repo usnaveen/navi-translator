@@ -1,0 +1,26 @@
+groups:
+  - name: navi_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(navi_translation_requests_total{status="error"}[5m]) / rate(navi_translation_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High translation error rate (> 5%)"
+
+      - alert: OOVDriftDetected
+        expr: navi_oov_rate > 0.15
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OOV drift detected — rate exceeds 15% baseline threshold"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(navi_translation_latency_ms_bucket[5m])) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 translation latency exceeds 5 seconds"

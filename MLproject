@@ -1,0 +1,20 @@
+name: navi-translator
+
+python_env: python_env.yaml
+
+entry_points:
+  train_whisper:
+    parameters:
+      config: {type: str, default: "params.yaml"}
+    command: "python src/training/train_whisper.py --config {config}"
+
+  train_marian:
+    parameters:
+      config: {type: str, default: "params.yaml"}
+    command: "python src/training/train_marian.py --config {config}"
+
+  evaluate:
+    parameters:
+      model_type: {type: str}
+      run_id: {type: str}
+    command: "python src/training/evaluate.py --model-type {model_type} --run-id {run_id}"

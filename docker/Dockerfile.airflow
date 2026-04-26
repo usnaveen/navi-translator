@@ -1,0 +1,17 @@
+FROM apache/airflow:2.8.1-python3.11
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+USER airflow
+
+# Install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Copy DAGs and source code
+COPY airflow/dags/ /opt/airflow/dags/
+COPY src/ /opt/airflow/src/
+COPY params.yaml /opt/airflow/params.yaml

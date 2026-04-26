@@ -1,0 +1,87 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Translation Requests (rate/min)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(navi_translation_requests_total[1m]) * 60",
+          "legendFormat": "{{input_type}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "title": "Latency Percentiles (ms)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(navi_translation_latency_ms_bucket[5m]))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, rate(navi_translation_latency_ms_bucket[5m]))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, rate(navi_translation_latency_ms_bucket[5m]))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "title": "OOV Rate (with baseline)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "navi_oov_rate", "legendFormat": "OOV rate" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "title": "Fallback Rate",
+      "type": "stat",
+      "targets": [
+        { "expr": "navi_fallback_rate", "legendFormat": "fallback rate" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "title": "Vocab Submissions",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(navi_vocab_submissions_total[5m]) * 60", "legendFormat": "submissions/min" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "title": "Model Version",
+      "type": "stat",
+      "targets": [
+        { "expr": "navi_model_version", "legendFormat": "version" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["navi", "mlops"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Na'vi Translator Overview",
+  "uid": "navi-overview"
+}
