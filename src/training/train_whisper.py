@@ -269,15 +269,11 @@ def main():
             learning_rate=whisper_params["learning_rate"],
             warmup_steps=whisper_params["warmup_steps"],
             num_train_epochs=whisper_params["num_epochs"],
-            eval_strategy="steps",       # step-based eval/save so a crash mid-epoch doesn't wipe progress
+            eval_strategy="no",          # no mid-training eval — MPS throttles badly during eval loops
             save_strategy="steps",
-            eval_steps=whisper_params["eval_steps"],
             save_steps=whisper_params["save_steps"],
-            save_total_limit=2,          # keep only best + latest checkpoint (saves disk)
-            load_best_model_at_end=True,
-            metric_for_best_model="wer",
-            greater_is_better=False,
-            predict_with_generate=False,  # skip beam search during eval to avoid OOM + slow evals
+            save_total_limit=2,          # keep only 2 checkpoints (saves disk)
+            predict_with_generate=False,
             generation_max_length=225,
             logging_steps=25,
             report_to=["mlflow"],
@@ -285,7 +281,7 @@ def main():
             remove_unused_columns=False,
         )
 
-        # Trainer
+        # Trainer — no EarlyStoppingCallback since eval_strategy="no"
         trainer = Seq2SeqTrainer(
             model=model,
             args=training_args,
@@ -294,11 +290,6 @@ def main():
             data_collator=data_collator,
             processing_class=processor.feature_extractor,
             compute_metrics=lambda pred: compute_wer_metric(pred, processor.tokenizer),
-            callbacks=[
-                EarlyStoppingCallback(
-                    early_stopping_patience=whisper_params["early_stopping_patience"]
-                )
-            ],
         )
 
         # Train

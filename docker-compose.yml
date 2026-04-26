@@ -11,6 +11,7 @@ services:
       - ./data:/app/data
       - ./mlruns:/app/mlruns
       - ./mlartifacts:/app/mlartifacts
+      - ./models:/app/models
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - PARAMS_FILE=/app/params.yaml
@@ -42,7 +43,7 @@ services:
     image: ghcr.io/mlflow/mlflow:v2.10.2
     container_name: navi-mlflow
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
       - ./mlruns:/mlflow/mlruns
       - ./mlartifacts:/mlflow/mlartifacts
@@ -50,7 +51,7 @@ services:
       mlflow server
       --host 0.0.0.0
       --port 5000
-      --backend-store-uri sqlite:///mlflow/mlruns/mlflow.db
+      --backend-store-uri /mlflow/mlruns
       --default-artifact-root /mlflow/mlartifacts
     networks:
       - navi-net
