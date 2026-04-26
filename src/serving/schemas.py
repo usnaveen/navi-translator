@@ -36,8 +36,12 @@ class AudioTranslationResponse(BaseModel):
     """Response for POST /translate/audio."""
 
     navi_text: str = Field(..., description="Transcribed Na'vi text from audio")
+    navi_corrected: str = Field("", description="Na'vi text after phonetic post-correction")
     english: str = Field(..., description="English translation")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Translation confidence score")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Combined translation confidence score")
+    asr_confidence: float = Field(0.0, ge=0.0, le=1.0, description="Whisper ASR confidence")
+    nmt_confidence: float = Field(0.0, ge=0.0, le=1.0, description="MarianMT/dictionary translation confidence")
+    fuzzy_corrections: int = Field(0, description="Number of tokens rescued by phonetic correction")
     latency_ms: int = Field(..., description="End-to-end processing time in milliseconds")
 
 

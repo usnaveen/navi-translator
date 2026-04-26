@@ -1,26 +1,73 @@
 groups:
-  - name: navi_alerts
+  - name: navi_translator_quality
+    interval: 30s
     rules:
       - alert: HighErrorRate
-        expr: rate(navi_translation_requests_total{status="error"}[5m]) / rate(navi_translation_requests_total[5m]) > 0.05
-        for: 5m
+        expr: |
+          sum(rate(navi_translation_requests_total{status="error"}[5m]))
+            / clamp_min(sum(rate(navi_translation_requests_total[5m])), 0.0001) > 0.05
+        for: 2m
         labels:
           severity: critical
+          team: mlops
         annotations:
-          summary: "High translation error rate (> 5%)"
+          summary: "Translation error rate above 5%"
+          description: "{{ $value | humanizePercentage }} of requests in the last 5 min returned an error."
+
+      - alert: HighFallbackRate
+        expr: navi_fallback_rate > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Fallback rate above 50% — model losing confidence"
+          description: |
+            More than half of recent translations dropped to dictionary fallback.
+            This is the classic distribution-drift signal: input traffic has moved
+            away from what the neural model was trained on.
 
       - alert: OOVDriftDetected
-        expr: navi_oov_rate > 0.15
+        expr: navi_oov_rate > 0.3
         for: 1m
         labels:
           severity: warning
+          team: mlops
         annotations:
-          summary: "OOV drift detected — rate exceeds 15% baseline threshold"
+          summary: "OOV rate above 30% baseline"
+          description: "Vocabulary mismatch is climbing. Investigate top-OOV-words panel."
 
-      - alert: HighLatency
-        expr: histogram_quantile(0.95, rate(navi_translation_latency_ms_bucket[5m])) > 5000
+      - alert: LowConfidenceTranslations
+        expr: |
+          sum(rate(navi_high_confidence_total[15m]))
+            / clamp_min(sum(rate(navi_translation_requests_total{status="success"}[15m])), 0.0001) < 0.4
         for: 5m
         labels:
           severity: warning
+          team: mlops
         annotations:
-          summary: "P95 translation latency exceeds 5 seconds"
+          summary: "Fewer than 40% of translations are high-confidence"
+          description: "Quality SLO breached. Combined model output confidence has degraded."
+
+  - name: navi_translator_reliability
+    interval: 30s
+    rules:
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(navi_translation_latency_ms_bucket[5m])) by (le)) > 5000
+        for: 3m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "P95 latency above 5s"
+          description: "P95 = {{ $value | humanize }}ms over the last 5 min."
+
+      - alert: BackendDown
+        expr: up{job="navi-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Translator backend is unreachable"
+          description: "Prometheus could not scrape the backend /metrics endpoint."

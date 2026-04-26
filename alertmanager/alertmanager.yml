@@ -1,0 +1,50 @@
+# Alertmanager configuration for the Na'vi translator.
+#
+# Routes all alerts to a local MailHog instance for the demo environment —
+# MailHog accepts SMTP on :1025 and exposes a web inbox on :8025, so reviewers
+# can watch real alert emails arrive without setting up a real SMTP provider.
+#
+# To swap to a real SMTP server (Gmail, SES, SendGrid, etc.) set:
+#   smtp_smarthost, smtp_from, smtp_auth_username, smtp_auth_password
+# in the global block below.
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "mailhog:1025"
+  smtp_from: "alerts@navi-translator.local"
+  smtp_require_tls: false
+
+route:
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: "mlops-team"
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: "mlops-team-critical"
+      group_wait: 5s
+      repeat_interval: 30m
+
+receivers:
+  - name: "mlops-team"
+    email_configs:
+      - to: "mlops@navi-translator.local"
+        send_resolved: true
+        headers:
+          Subject: "[Na'vi Translator] {{ .Status | toUpper }} — {{ .CommonLabels.alertname }}"
+
+  - name: "mlops-team-critical"
+    email_configs:
+      - to: "oncall@navi-translator.local"
+        send_resolved: true
+        headers:
+          Subject: "[Na'vi Translator CRITICAL] {{ .CommonLabels.alertname }}"
+
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ["alertname"]

@@ -20,6 +20,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.monitoring.prometheus_exporter import (
     get_metrics,
+    record_confidence,
+    record_fuzzy_corrections,
+    record_oov_words,
     record_translation,
     record_vocab_submission,
     update_fallback_rate,
@@ -149,11 +152,22 @@ async def translate_audio(request: Request, file: UploadFile = File(...)):
         _track_oov(word_breakdown)
         _track_fallback(nmt_confidence < engine.params["marian"]["fallback_confidence_threshold"])
         record_translation("audio", "success", latency_ms)
+        record_confidence("audio", confidence)
+        record_oov_words([b["navi"] for b in word_breakdown if not b.get("found")])
+        record_fuzzy_corrections(word_breakdown)
+
+        # Reconstruct the corrected Na'vi sentence from breakdown for the UI
+        corrected_text = " ".join(b.get("navi_corrected", b["navi"]) for b in word_breakdown)
+        fuzzy_count = sum(1 for b in word_breakdown if b.get("fuzzy"))
 
         return AudioTranslationResponse(
             navi_text=navi_text,
+            navi_corrected=corrected_text,
             english=english,
             confidence=confidence,
+            asr_confidence=round(asr_confidence, 3),
+            nmt_confidence=round(nmt_confidence, 3),
+            fuzzy_corrections=fuzzy_count,
             latency_ms=latency_ms,
         )
 
@@ -196,6 +210,9 @@ async def translate_text(request: Request, body: TextTranslationRequest):
         _track_oov(word_breakdown)
         _track_fallback(confidence < engine.params["marian"]["fallback_confidence_threshold"])
         record_translation("text", "success", latency_ms)
+        record_confidence("text", confidence)
+        record_oov_words([b["navi"] for b in word_breakdown if not b.get("found")])
+        record_fuzzy_corrections(word_breakdown)
 
         return TextTranslationResponse(
             english=english,

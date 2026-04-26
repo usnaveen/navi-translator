@@ -46,10 +46,9 @@ function syncTabMeta(tabName) {
     const meta = TAB_META[tabName];
     if (!meta) return;
 
-    document.getElementById('active-mode-chip').textContent = meta.chip;
-    document.getElementById('hero-mode-display').textContent = meta.title;
-    document.getElementById('hero-mode-copy').textContent = meta.copy;
-    document.getElementById('footer-status').textContent = meta.footer;
+    setText('active-mode-chip', meta.chip);
+    setText('hero-mode-display', meta.title);
+    setText('hero-mode-copy', meta.copy);
     document.body.dataset.activeTab = tabName;
 }
 
@@ -72,6 +71,136 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
+// --- Waveform visualizer ---
+let audioContext = null;
+let analyser = null;
+let waveformAnimationId = null;
+let activeStream = null;
+let staticWaveformData = null;  // Float32Array of decoded audio samples for uploaded files
+
+function getCanvasCtx() {
+    const canvas = document.getElementById('waveform-canvas');
+    if (!canvas) return null;
+    // Match canvas pixel size to its CSS size for crispness
+    const rect = canvas.getBoundingClientRect();
+    if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+    }
+    return { canvas, ctx: canvas.getContext('2d') };
+}
+
+function drawIdleWaveform() {
+    const c = getCanvasCtx();
+    if (!c) return;
+    const { canvas, ctx } = c;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(78, 220, 200, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+}
+
+function drawLiveWaveform() {
+    const c = getCanvasCtx();
+    if (!c || !analyser) return;
+    const { canvas, ctx } = c;
+    const bufferLength = analyser.fftSize;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(data);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#62f4d2');
+    grad.addColorStop(1, '#3a8ce0');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const sliceWidth = canvas.width / bufferLength;
+    let x = 0;
+    for (let i = 0; i < bufferLength; i++) {
+        const v = data[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        x += sliceWidth;
+    }
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+
+    waveformAnimationId = requestAnimationFrame(drawLiveWaveform);
+}
+
+function drawStaticWaveform(samples) {
+    const c = getCanvasCtx();
+    if (!c) return;
+    const { canvas, ctx } = c;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const step = Math.max(1, Math.floor(samples.length / canvas.width));
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#62f4d2');
+    grad.addColorStop(1, '#3a8ce0');
+    ctx.fillStyle = grad;
+    const mid = canvas.height / 2;
+    for (let x = 0; x < canvas.width; x++) {
+        let min = 1.0, max = -1.0;
+        for (let i = 0; i < step; i++) {
+            const v = samples[x * step + i] || 0;
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        const y1 = mid + min * mid;
+        const y2 = mid + max * mid;
+        ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+    }
+}
+
+function startVisualizer(stream) {
+    audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    drawLiveWaveform();
+}
+
+function stopVisualizer() {
+    if (waveformAnimationId) {
+        cancelAnimationFrame(waveformAnimationId);
+        waveformAnimationId = null;
+    }
+    analyser = null;
+}
+
+async function decodeBlobToSamples(blob) {
+    audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuf = await blob.arrayBuffer();
+    try {
+        const decoded = await audioContext.decodeAudioData(arrayBuf.slice(0));
+        return decoded.getChannelData(0);
+    } catch {
+        return null;
+    }
+}
+
+function setPlaybackSource(blob) {
+    const audio = document.getElementById('audio-playback');
+    if (!audio) return;
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(blob);
+    audio.classList.remove('hidden');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    drawIdleWaveform();
+    window.addEventListener('resize', () => {
+        if (staticWaveformData) drawStaticWaveform(staticWaveformData);
+        else if (!analyser) drawIdleWaveform();
+    });
+});
+
+// --- Recording flow ---
 async function toggleRecording() {
     if (isRecording) {
         stopRecording();
@@ -82,9 +211,11 @@ async function toggleRecording() {
 
 async function startRecording() {
     hideError('audio-error');
+    staticWaveformData = null;
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        activeStream = stream;
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
@@ -92,14 +223,21 @@ async function startRecording() {
             if (event.data.size > 0) audioChunks.push(event.data);
         };
 
-        mediaRecorder.onstop = () => {
+        mediaRecorder.onstop = async () => {
             const blob = new Blob(audioChunks, { type: 'audio/wav' });
             stream.getTracks().forEach((track) => track.stop());
+            activeStream = null;
+            stopVisualizer();
+            setPlaybackSource(blob);
+            const samples = await decodeBlobToSamples(blob);
+            if (samples) { staticWaveformData = samples; drawStaticWaveform(samples); }
+            else drawIdleWaveform();
             setText('audio-action-status', 'Signal captured. Decoding waveform...');
             translateAudio(blob);
         };
 
         mediaRecorder.start();
+        startVisualizer(stream);
         isRecording = true;
         updateRecordingUI(true);
     } catch {
@@ -118,21 +256,24 @@ function stopRecording() {
 
 function updateRecordingUI(recording) {
     const button = document.getElementById('record-btn');
-    const label = document.getElementById('record-label');
     const indicator = document.getElementById('recording-indicator');
-
-    button.classList.toggle('recording', recording);
-    label.textContent = recording ? 'Stop Capture' : 'Arm Recorder';
-    indicator.classList.toggle('hidden', !recording);
-    setText('audio-action-status', recording ? 'Listening for Na\'vi speech...' : 'Microphone standing by.');
+    if (button) {
+        button.classList.toggle('recording', recording);
+        button.title = recording ? 'Stop Capture' : 'Arm Recorder';
+    }
+    if (indicator) indicator.classList.toggle('hidden', !recording);
+    setText('audio-action-status', recording ? "Listening for Na'vi speech..." : 'Microphone standing by.');
 }
 
-function handleAudioUpload(event) {
+async function handleAudioUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     setText('upload-status', `Loaded sample: ${file.name}`);
     setText('audio-action-status', 'Audio file loaded. Decoding waveform...');
+    setPlaybackSource(file);
+    const samples = await decodeBlobToSamples(file);
+    if (samples) { staticWaveformData = samples; drawStaticWaveform(samples); }
     translateAudio(file);
 }
 
@@ -157,8 +298,13 @@ async function translateAudio(audioBlob) {
 
         const data = await response.json();
         setText('audio-navi', data.navi_text);
+        const corrected = data.navi_corrected || data.navi_text;
+        setText('audio-corrected', corrected === data.navi_text ? '(no correction needed)' : corrected);
         setText('audio-english', data.english);
         setText('audio-confidence', `${(data.confidence * 100).toFixed(1)}%`);
+        setText('audio-asr-conf', `${((data.asr_confidence ?? 0) * 100).toFixed(1)}%`);
+        setText('audio-nmt-conf', `${((data.nmt_confidence ?? 0) * 100).toFixed(1)}%`);
+        setText('audio-fuzzy-count', `${data.fuzzy_corrections ?? 0}`);
         setText('audio-latency', data.latency_ms);
         setText('audio-action-status', 'Translation locked. Readout updated.');
         showResult('audio-result');
@@ -385,7 +531,8 @@ function escapeHtml(text) {
 }
 
 function setText(id, value) {
-    document.getElementById(id).textContent = value;
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
 }
 
 function setButtonDisabled(id, disabled) {

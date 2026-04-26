@@ -3,16 +3,18 @@
 
 # Na'vi Language Translator
 
-An end-to-end MLOps application that translates Na'vi text and speech into English. The project is designed as a low-resource language system: a lightweight MarianMT translation model handles Na'vi to English text, Whisper-Small with LoRA handles audio transcription, and a Reykunyu dictionary fallback keeps short phrases usable when neural confidence is low.
+An end-to-end MLOps application that translates Na'vi text and speech into English. The project is designed as a low-resource language system: a fine-tuned MarianMT translation model handles Na'vi → English text, Whisper-tiny with LoRA adapters handles audio transcription, and a Reykunyu dictionary fallback (with bounded fuzzy match) keeps short phrases usable when neural confidence is low.
 
 ## Overview
 
 Na'vi is a constructed language with limited public audio data, so the system is intentionally built around low-resource constraints:
 
-- Text translation: fine-tuned MarianMT model plus dictionary fallback.
-- Speech translation: Whisper-Small with LoRA adapters trained on a small Na'vi audio set.
-- Reproducibility: configuration in `params.yaml`, data stages in `dvc.yaml`, experiment tracking in MLflow.
-- Operations: FastAPI backend, nginx frontend, Prometheus metrics, Grafana dashboard, Airflow training DAG, and GitHub Actions CI.
+- **Text translation**: fine-tuned MarianMT model + bounded Levenshtein fuzzy match against the Reykunyu dictionary.
+- **Speech translation**: Whisper-tiny with LoRA adapters (5 epochs / 4945 steps, train_loss 0.38) trained on the Reykunyu audio corpus.
+- **Phonetic post-correction**: third pipeline stage that rescues ASR-noisy Na'vi tokens by matching them to canonical dictionary entries.
+- **Models served from MLflow registry**: the backend resolves `models:/navi-whisper/Production` and `models:/navi-marian/Production` at startup, falling back to local snapshots if the registry is unreachable.
+- **Reproducibility**: configuration in `params.yaml`, data stages in `dvc.yaml`, experiment tracking in MLflow.
+- **Operations**: FastAPI backend, nginx frontend, Prometheus metrics, Grafana dashboard, Alertmanager + MailHog for email alerts, Airflow training DAG, and GitHub Actions CI.
 
 ## Architecture
 

@@ -73,8 +73,187 @@
       "id": 6,
       "title": "Model Version",
       "type": "stat",
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "mappings": []
+        }
+      },
       "targets": [
-        { "expr": "navi_model_version", "legendFormat": "version" }
+        {
+          "expr": "navi_model_version_info",
+          "legendFormat": "{{version}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 7,
+      "title": "Confidence Distribution (heatmap)",
+      "type": "heatmap",
+      "description": "Distribution of combined translation-confidence scores. Shifts to the right = model getting more confident.",
+      "targets": [
+        {
+          "expr": "sum(rate(navi_translation_confidence_bucket[5m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "options": {
+        "calculate": false,
+        "yAxis": { "unit": "short", "decimals": 2 },
+        "color": { "mode": "scheme", "scheme": "Turbo", "steps": 64 },
+        "tooltip": { "show": true, "yHistogram": true }
+      }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 8,
+      "title": "High-Confidence Rate (≥ 0.7)",
+      "type": "stat",
+      "description": "Share of recent translations that produced high-confidence (≥ 0.7) output. Single-number quality SLO.",
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(navi_high_confidence_total[15m])) / clamp_min(sum(rate(navi_translation_requests_total{status=\"success\"}[15m])), 0.0001)",
+          "legendFormat": "high-conf rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "id": 9,
+      "title": "Error Rate by Input Type",
+      "type": "timeseries",
+      "description": "Fraction of requests returning an error, split by audio vs text. Standard reliability SLI.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (input_type) (rate(navi_translation_requests_total{status=\"error\"}[5m])) / clamp_min(sum by (input_type) (rate(navi_translation_requests_total[5m])), 0.0001)",
+          "legendFormat": "{{input_type}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "id": 11,
+      "title": "Fuzzy-Match Correction Rate",
+      "type": "stat",
+      "description": "Share of Na'vi tokens rescued by the Levenshtein post-correction layer. High = ASR is noisy but recoverable. Low = either ASR is clean or the correction layer can't help.",
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.3 },
+              { "color": "red", "value": 0.6 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(navi_fuzzy_corrections_total[15m])) / clamp_min(sum(rate(navi_tokens_processed_total[15m])), 0.0001)",
+          "legendFormat": "fuzzy correction rate"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "id": 12,
+      "title": "Fuzzy Corrections by Edit Distance",
+      "type": "timeseries",
+      "description": "How aggressive the post-correction layer is being. Distance 1 = single char fix (good), distance 2 = larger phonetic gap (worth scrutinizing).",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(navi_fuzzy_corrections_total[5m]) * 60",
+          "legendFormat": "edit dist {{edit_distance}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "id": 10,
+      "title": "Top 10 OOV Words",
+      "type": "barchart",
+      "description": "Most-frequent Na'vi tokens that fell out of the dictionary. These are concrete vocabulary gaps to address next.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "xTickLabelRotation": 0,
+        "legend": { "showLegend": false }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (word) (navi_oov_words_total))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{word}}"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true } } }
       ]
     }
   ],

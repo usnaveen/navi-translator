@@ -1,0 +1,27 @@
+# Serving-only requirements — no training/eval packages
+# Pinned versions for fast, reproducible Docker builds
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.10.0+cpu
+torchaudio==2.10.0+cpu
+
+transformers==4.40.0
+peft==0.10.0
+sentencepiece==0.2.0
+
+librosa==0.10.1
+soundfile==0.12.1
+
+numpy==1.26.4
+pyyaml==6.0.1
+requests==2.31.0
+
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pydantic==2.7.0
+
+prometheus-client==0.20.0
+
+# --- MLflow client (lookup only, no server deps) ---
+mlflow-skinny==2.10.2

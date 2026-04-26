@@ -75,6 +75,32 @@ services:
     depends_on:
       - backend
 
+  # ---- Alertmanager: Alert routing + email delivery ----
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: navi-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - navi-net
+    depends_on:
+      - mailhog
+
+  # ---- MailHog: Fake SMTP for demo email alerts (web UI on :8025) ----
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: navi-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - navi-net
+
   # ---- Grafana: Dashboards ----
   grafana:
     image: grafana/grafana:10.3.1

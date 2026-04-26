@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout=300 --retries=5 -r requirements.txt
+COPY requirements-serving.txt .
+RUN pip install --no-cache-dir --timeout=300 --retries=5 -r requirements-serving.txt
 
 # Copy source code
 COPY src/ src/

@@ -78,6 +78,44 @@ MODEL_VERSION = Info(
     registry=REGISTRY,
 )
 
+# --- Quality metrics ---
+CONFIDENCE_HIST = Histogram(
+    "navi_translation_confidence",
+    "Distribution of combined translation confidence scores",
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0],
+    labelnames=["input_type"],
+    registry=REGISTRY,
+)
+
+HIGH_CONFIDENCE_TOTAL = Counter(
+    "navi_high_confidence_total",
+    "Translations with combined confidence >= 0.7",
+    ["input_type"],
+    registry=REGISTRY,
+)
+
+# --- Drift / data-quality metric ---
+OOV_WORDS = Counter(
+    "navi_oov_words_total",
+    "Count of Na'vi tokens not found in the dictionary, labeled by word",
+    ["word"],
+    registry=REGISTRY,
+)
+
+# --- Fuzzy correction (phonetic post-correction layer) ---
+FUZZY_CORRECTIONS = Counter(
+    "navi_fuzzy_corrections_total",
+    "Tokens rescued by the fuzzy-match (Levenshtein) post-correction layer",
+    ["edit_distance"],
+    registry=REGISTRY,
+)
+
+TOKENS_PROCESSED = Counter(
+    "navi_tokens_processed_total",
+    "Total Na'vi tokens that passed through the dictionary stage",
+    registry=REGISTRY,
+)
+
 
 def get_metrics() -> bytes:
     """Generate Prometheus text format metrics."""
@@ -108,3 +146,34 @@ def update_fallback_rate(rate: float):
 def update_model_version(version: str):
     """Update the model version info."""
     MODEL_VERSION.info({"version": version})
+
+
+def record_confidence(input_type: str, confidence: float):
+    """Record a translation's confidence score and bump high-conf counter."""
+    CONFIDENCE_HIST.labels(input_type=input_type).observe(confidence)
+    if confidence >= 0.7:
+        HIGH_CONFIDENCE_TOTAL.labels(input_type=input_type).inc()
+
+
+def record_fuzzy_corrections(breakdown: list[dict]):
+    """Track tokens corrected by the Levenshtein post-correction layer."""
+    for entry in breakdown:
+        TOKENS_PROCESSED.inc()
+        d = entry.get("edit_distance", 0)
+        if d > 0:
+            FUZZY_CORRECTIONS.labels(edit_distance=str(d)).inc()
+
+
+def record_oov_words(words: list[str]):
+    """Increment OOV counter for each unresolved Na'vi token.
+
+    We cap label cardinality by truncating very long tokens (Prometheus
+    advice: keep label values short and bounded).
+    """
+    for w in words:
+        if not w:
+            continue
+        # Strip non-alphanumeric noise and bound length to keep cardinality sane
+        clean = "".join(c for c in w.lower() if c.isalnum() or c in "ìäáéíóúñ")[:20]
+        if clean:
+            OOV_WORDS.labels(word=clean).inc()
