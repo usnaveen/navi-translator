@@ -30,23 +30,6 @@
                     <p class="hero-copy" id="hero-mode-copy">Capture spoken Na'vi and decode it into clear English.</p>
                 </div>
 
-                <div class="signal-rack">
-                    <div class="signal-module">
-                        <span class="signal-label">ASR</span>
-                        <strong>LIVE</strong>
-                        <small>Whisper capture</small>
-                    </div>
-                    <div class="signal-module">
-                        <span class="signal-label">MT</span>
-                        <strong>READY</strong>
-                        <small>Marian decode</small>
-                    </div>
-                    <div class="signal-module">
-                        <span class="signal-label">OPS</span>
-                        <strong>TRACKED</strong>
-                        <small>MLOps telemetry</small>
-                    </div>
-                </div>
             </section>
 
             <nav class="tab-dock" aria-label="Translator modes">
@@ -79,34 +62,25 @@
                             </div>
 
                             <div class="recorder-stage">
-                                <div class="meter-stack" aria-hidden="true">
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                    <span class="meter-bar"></span>
-                                </div>
+                                <canvas id="waveform-canvas" class="waveform-canvas" width="600" height="120"></canvas>
 
-                                <button id="record-btn" class="btn btn-primary btn-record" onclick="toggleRecording()">
-                                    <span class="btn-code">REC</span>
-                                    <span id="record-label">Arm Recorder</span>
-                                </button>
+                                <div class="recorder-controls">
+                                    <button id="record-btn" class="btn btn-icon btn-mic" onclick="toggleRecording()" title="Arm Recorder" aria-label="Arm Recorder">
+                                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                                            <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+                                        </svg>
+                                    </button>
+                                    <input type="file" id="audio-file" accept="audio/*" onchange="handleAudioUpload(event)" hidden>
+                                    <button class="btn btn-icon btn-attach" onclick="document.getElementById('audio-file').click()" title="Attach Audio" aria-label="Attach audio file">
+                                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                                            <path d="M16.5 6v11.5a4.5 4.5 0 1 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 1 0 6 0V5a4.5 4.5 0 1 0-9 0v12.5a6 6 0 1 0 12 0V6h-1.5z"/>
+                                        </svg>
+                                    </button>
+                                    <audio id="audio-playback" controls class="audio-playback hidden"></audio>
+                                </div>
 
                                 <div id="recording-indicator" class="recording-indicator hidden">Live input detected</div>
                                 <p class="stage-note" id="audio-action-status">Microphone standing by.</p>
-                            </div>
-
-                            <div class="separator"><span>Alt Input</span></div>
-
-                            <div class="upload-rack" id="upload-area">
-                                <input type="file" id="audio-file" accept="audio/*" onchange="handleAudioUpload(event)" hidden>
-                                <button class="btn btn-secondary" onclick="document.getElementById('audio-file').click()">
-                                    <span class="btn-code">+</span>
-                                    <span>Load Audio Sample</span>
-                                </button>
                                 <p class="hint" id="upload-status">WAV, MP3, or OGG. Short phrases work best.</p>
                             </div>
 
@@ -120,23 +94,31 @@
                                 <p class="panel-description">The system will transcribe the Na'vi phrase and render the English translation here.</p>
                             </div>
 
-                            <div class="display-frame">
-                                <div id="audio-placeholder" class="result-placeholder">
-                                    Awaiting a live capture or uploaded sample.
-                                </div>
+                            <div id="audio-placeholder" class="result-placeholder">
+                                Awaiting a live capture or uploaded sample.
+                            </div>
 
-                                <div id="audio-result" class="result-box hidden" data-placeholder="audio-placeholder">
-                                    <div class="result-group">
-                                        <span class="result-label">Na'vi Transcript</span>
-                                        <p id="audio-navi" class="result-value"></p>
-                                    </div>
-                                    <div class="result-group">
-                                        <span class="result-label">English Render</span>
-                                        <p id="audio-english" class="result-value result-value-accent"></p>
-                                    </div>
-                                    <div class="result-meta">
-                                        <span>Confidence <strong id="audio-confidence"></strong></span>
-                                        <span>Latency <strong id="audio-latency"></strong> ms</span>
+                            <div id="audio-result" class="result-stack hidden" data-placeholder="audio-placeholder">
+                                <div class="result-card">
+                                    <span class="result-label">Stage 1 — Whisper ASR (raw)</span>
+                                    <p id="audio-navi" class="result-value"></p>
+                                    <span class="stage-meta">ASR confidence <strong id="audio-asr-conf"></strong></span>
+                                </div>
+                                <div class="result-card">
+                                    <span class="result-label">Stage 2 — Phonetic Correction</span>
+                                    <p id="audio-corrected" class="result-value"></p>
+                                    <span class="stage-meta">Tokens fuzzy-corrected <strong id="audio-fuzzy-count"></strong></span>
+                                </div>
+                                <div class="result-card">
+                                    <span class="result-label">Stage 3 — MarianMT / Dictionary</span>
+                                    <p id="audio-english" class="result-value result-value-accent"></p>
+                                    <span class="stage-meta">NMT confidence <strong id="audio-nmt-conf"></strong></span>
+                                </div>
+                                <div class="result-card result-card-meta">
+                                    <span class="result-label">Translation Metadata</span>
+                                    <div class="meta-grid">
+                                        <div><span class="meta-key">Combined Confidence</span><strong id="audio-confidence"></strong></div>
+                                        <div><span class="meta-key">Latency</span><strong><span id="audio-latency"></span> ms</strong></div>
                                     </div>
                                 </div>
                             </div>
@@ -154,7 +136,7 @@
                             </div>
 
                             <div class="input-rack">
-                                <textarea id="navi-input" placeholder="Type Na'vi text here... e.g. kaltxi" rows="6" maxlength="500"></textarea>
+                                <textarea id="navi-input" placeholder="Type Na'vi text here... e.g. kaltxì, irayo, tìyawn" rows="6" maxlength="500"></textarea>
                                 <div class="action-row">
                                     <button id="text-translate-btn" class="btn btn-primary" onclick="translateText()">
                                         <span class="btn-code">&gt;</span>
@@ -164,9 +146,12 @@
                             </div>
 
                             <div class="example-strip" aria-label="Quick examples">
-                                <button class="mini-btn" onclick="setTextExample('kaltxi')">kaltxi</button>
-                                <button class="mini-btn" onclick="setTextExample('oel ngati kameie')">oel ngati kameie</button>
+                                <button class="mini-btn" onclick="setTextExample('kaltxì')">kaltxì</button>
                                 <button class="mini-btn" onclick="setTextExample('irayo')">irayo</button>
+                                <button class="mini-btn" onclick="setTextExample('kìyevame')">kìyevame</button>
+                                <button class="mini-btn" onclick="setTextExample('eywa')">eywa</button>
+                                <button class="mini-btn" onclick="setTextExample('tìyawn')">tìyawn</button>
+                                <button class="mini-btn" onclick="setTextExample('sìltsan')">sìltsan</button>
                             </div>
 
                             <div id="text-error" class="error-box hidden"></div>
@@ -289,7 +274,7 @@
                             </div>
 
                             <div class="link-grid">
-                                <a href="http://localhost:5050" target="_blank" class="pipeline-link">
+                                <a href="http://localhost:5001" target="_blank" class="pipeline-link">
                                     <strong>MLflow</strong>
                                     <span>Experiments and registry</span>
                                 </a>
@@ -311,17 +296,6 @@
                 </section>
             </section>
 
-            <footer class="transport-bar">
-                <div class="transport-readout">
-                    <span class="transport-label">Deck Status</span>
-                    <strong id="footer-status">FIELD CONSOLE NOMINAL</strong>
-                </div>
-                <div class="transport-meta">
-                    <span>Whisper</span>
-                    <span>MarianMT</span>
-                    <span>MLOps</span>
-                </div>
-            </footer>
         </main>
     </div>
 
