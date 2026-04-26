@@ -7,7 +7,7 @@
 
 # --- Data Ingestion ---
 data:
-  reykunyu_words_url: "https://raw.githubusercontent.com/Willem3141/navi-reykunyu/main/words.json"
+  reykunyu_words_url: "https://reykunyu.lu/words.json"
   audio_sample_rate: 16000
   audio_channels: 1           # mono
   min_audio_duration: 0.3     # seconds

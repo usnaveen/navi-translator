@@ -27,12 +27,16 @@ def load_params(params_file: str = "params.yaml") -> dict:
 
 
 def download_words(url: str, output_path: Path) -> list[dict]:
-    """Download the full Na'vi dictionary from Reykunyu GitHub.
+    """Download the full Na'vi dictionary from reykunyu.lu.
 
-    The words.json file contains entries like:
-        { "na'vi": "kaltxì", "en": "hello", "type": "intj", ... }
+    The words.json file is a list of entries like:
+        {
+            "na'vi": "kaltxì",
+            "translations": [ { "en": "hello", ... } ],
+            "type": "intj"
+        }
 
-    Returns the list of validated word entries.
+    Returns the list of validated, normalized word entries.
     """
     logger.info("Downloading Na'vi dictionary from %s", url)
     response = requests.get(url, timeout=30)
@@ -82,35 +86,39 @@ def _parse_words(raw_data: list | dict) -> list[dict]:
 
 
 def _extract_word(entry: dict) -> dict | None:
-    """Extract a normalized word record from a raw entry.
+    """Extract a normalized word record from a raw Reykunyu entry.
 
-    Returns None if the entry is invalid (missing required fields).
+    Real reykunyu.lu format (as of 2026):
+        {
+            "na'vi": "kaltxì",
+            "translations": [ { "en": "hello", "de": "...", ... } ],
+            "type": "intj",
+            ...
+        }
+
+    Returns None if the entry is missing required fields.
     """
-    # Try different key names the API might use
+    # Na'vi word — key literally contains an apostrophe
     navi = entry.get("na'vi") or entry.get("navi") or entry.get("word", "")
     navi = navi.strip() if isinstance(navi, str) else ""
 
-    # English translations can be in different formats
-    en_raw = entry.get("en") or entry.get("translations", {}).get("en", [])
-    if isinstance(en_raw, str):
-        en = en_raw.strip()
-    elif isinstance(en_raw, list):
-        # Join multiple English meanings
+    # English meaning lives inside the translations list
+    en = ""
+    translations = entry.get("translations", [])
+    if isinstance(translations, list):
+        # Collect the English gloss from every translation object
         meanings = []
-        for item in en_raw:
-            if isinstance(item, str):
-                meanings.append(item.strip())
-            elif isinstance(item, dict):
-                meaning = item.get("en", "") or item.get("meaning", "")
+        for t in translations:
+            if isinstance(t, dict):
+                meaning = t.get("en", "").strip()
                 if meaning:
-                    meanings.append(meaning.strip())
+                    meanings.append(meaning)
         en = "; ".join(meanings)
-    elif isinstance(en_raw, dict):
-        en = en_raw.get("en", "") or en_raw.get("meaning", "")
-    else:
-        en = ""
+    elif isinstance(translations, dict):
+        # Older format: translations is a plain dict { "en": "...", ... }
+        en = translations.get("en", "").strip()
 
-    word_type = entry.get("type") or entry.get("pos") or "unknown"
+    word_type = entry.get("type") or "unknown"
 
     if not navi or not en:
         return None
