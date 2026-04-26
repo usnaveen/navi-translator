@@ -36,8 +36,8 @@ whisper:
   batch_size: 1                        # effective batch = 4 via gradient_accumulation_steps=4
   num_epochs: 5
   warmup_steps: 100
-  eval_steps: 200
-  save_steps: 200                      # NEW: checkpoint every 200 steps — crash protection
+  eval_steps: 500                      # eval ~10 times across training (was 200 — too frequent, caused long pauses)
+  save_steps: 500                      # checkpoint every 500 steps; max ~8 min lost on crash. Must equal/multiple of eval_steps for load_best_model_at_end
   early_stopping_patience: 3
   language: "mi"              # Maori — closest Whisper-supported language to Na'vi (Polynesian phonology)
   target_wer: 0.35
