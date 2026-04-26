@@ -67,14 +67,48 @@ class TranslationEngine:
         self._loaded = self.whisper_loaded or self.marian_loaded
         logger.info("Models loaded. Ready: %s", self._loaded)
 
+    @staticmethod
+    def _clean_navi(word: str) -> str:
+        """Normalize Reykunyu multi-form notation to a plain word.
+
+        Reykunyu stores words like "kal/[txì]" where:
+          /  = morpheme boundary (join the parts together)
+          [] = optional component (include it for the canonical form)
+
+        Examples:
+          "kal/[txì]"    → "kaltxì"
+          "['ang]/tsìk"  → "'angtsìk"
+          "'aw/si/[teng]" → "'awsiteng"
+        """
+        return word.replace("[", "").replace("]", "").replace("/", "").strip()
+
     def _load_dictionary(self):
-        """Load Na'vi dictionary for word-by-word fallback."""
+        """Load Na'vi dictionary for word-by-word fallback.
+
+        Builds two indexes:
+        - Raw form:   "kal/[txì]"  → "hello"
+        - Clean form: "kaltxì"     → "hello"
+        so that user input (always clean) hits the lookup correctly.
+        """
         words_path = PROJECT_ROOT / "data" / "raw" / "words.json"
         try:
             with open(words_path, encoding="utf-8") as f:
                 self.words = json.load(f)
-            self.word_lookup = {w["navi"].lower(): w["en"] for w in self.words}
-            logger.info("Loaded %d dictionary entries", len(self.words))
+
+            self.word_lookup = {}
+            for w in self.words:
+                en = w["en"]
+                raw_key = w["navi"].lower()
+                clean_key = self._clean_navi(w["navi"]).lower()
+                # Index both so either form resolves correctly
+                self.word_lookup[raw_key] = en
+                self.word_lookup[clean_key] = en
+
+            logger.info(
+                "Loaded %d dictionary entries (%d lookup keys)",
+                len(self.words),
+                len(self.word_lookup),
+            )
         except FileNotFoundError:
             logger.warning("No dictionary found at %s", words_path)
 
