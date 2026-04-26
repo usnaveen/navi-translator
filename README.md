@@ -1,3 +1,6 @@
+## Name: NAVEEN US
+## ROll Number: DA25M020
+
 # Na'vi Language Translator
 
 An end-to-end MLOps application that translates Na'vi text and speech into English. The project is designed as a low-resource language system: a lightweight MarianMT translation model handles Na'vi to English text, Whisper-Small with LoRA handles audio transcription, and a Reykunyu dictionary fallback keeps short phrases usable when neural confidence is low.
