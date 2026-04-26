@@ -3,210 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Na'vi Translator — Eywa ngahu</title>
+    <title>Na'vi Translator Console</title>
     <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <h1>Na'vi Translator</h1>
-            <p class="tagline">Eywa ngahu — The Great Mother is with you</p>
-        </div>
-        <button class="help-btn" onclick="toggleHelp()" title="User Manual">?</button>
-    </header>
-
-    <!-- Tab Navigation -->
-    <nav class="tabs">
-        <button class="tab active" data-tab="audio" onclick="switchTab('audio')">Translate Audio</button>
-        <button class="tab" data-tab="text" onclick="switchTab('text')">Translate Text</button>
-        <button class="tab" data-tab="contribute" onclick="switchTab('contribute')">Contribute</button>
-        <button class="tab" data-tab="pipeline" onclick="switchTab('pipeline')">Pipeline Status</button>
-    </nav>
-
-    <!-- Tab Content -->
-    <main class="content">
-
-        <!-- Audio Translation Tab -->
-        <section id="tab-audio" class="tab-panel active">
-            <div class="card">
-                <h2>Audio Translation</h2>
-                <p class="description">Record Na'vi speech or upload an audio file to translate to English.</p>
-
-                <div class="audio-controls">
-                    <button id="record-btn" class="btn btn-primary btn-large" onclick="toggleRecording()">
-                        <span id="record-icon">🎤</span>
-                        <span id="record-label">Start Recording</span>
-                    </button>
-                    <div id="recording-indicator" class="recording-indicator hidden">
-                        <span class="pulse"></span> Recording...
-                    </div>
-                </div>
-
-                <div class="divider">or</div>
-
-                <div class="upload-area" id="upload-area">
-                    <input type="file" id="audio-file" accept="audio/*" onchange="handleAudioUpload(event)" hidden>
-                    <button class="btn btn-secondary" onclick="document.getElementById('audio-file').click()">
-                        Upload Audio File
-                    </button>
-                    <p class="hint">WAV, MP3, or OGG — max 30 seconds</p>
-                </div>
-
-                <div id="audio-result" class="result-box hidden">
-                    <h3>Translation Result</h3>
-                    <div class="result-row">
-                        <label>Na'vi (transcribed):</label>
-                        <span id="audio-navi" class="result-value"></span>
-                    </div>
-                    <div class="result-row">
-                        <label>English:</label>
-                        <span id="audio-english" class="result-value highlight"></span>
-                    </div>
-                    <div class="result-meta">
-                        <span>Confidence: <strong id="audio-confidence"></strong></span>
-                        <span>Latency: <strong id="audio-latency"></strong>ms</span>
-                    </div>
-                </div>
-
-                <div id="audio-error" class="error-box hidden"></div>
-            </div>
-        </section>
-
-        <!-- Text Translation Tab -->
-        <section id="tab-text" class="tab-panel">
-            <div class="card">
-                <h2>Text Translation</h2>
-                <p class="description">Type Na'vi text to translate to English with word-by-word breakdown.</p>
-
-                <div class="input-group">
-                    <textarea id="navi-input" placeholder="Type Na'vi text here... e.g. kaltxì" rows="3" maxlength="500"></textarea>
-                    <button class="btn btn-primary" onclick="translateText()">Translate</button>
-                </div>
-
-                <div id="text-result" class="result-box hidden">
-                    <h3>Translation</h3>
-                    <div class="result-row">
-                        <label>English:</label>
-                        <span id="text-english" class="result-value highlight"></span>
-                    </div>
-                    <div class="result-meta">
-                        <span>Confidence: <strong id="text-confidence"></strong></span>
-                        <span>Latency: <strong id="text-latency"></strong>ms</span>
-                    </div>
-
-                    <h3>Word Breakdown</h3>
-                    <div id="word-breakdown" class="breakdown-grid"></div>
-                </div>
-
-                <div id="text-error" class="error-box hidden"></div>
-            </div>
-        </section>
-
-        <!-- Contribute Tab -->
-        <section id="tab-contribute" class="tab-panel">
-            <div class="card">
-                <h2>Contribute a Word</h2>
-                <p class="description">Help grow the Na'vi dictionary by submitting new words with optional audio.</p>
-
-                <form id="contribute-form" onsubmit="submitVocab(event)">
-                    <div class="form-group">
-                        <label for="contrib-navi">Na'vi Word</label>
-                        <input type="text" id="contrib-navi" placeholder="e.g. fya'o" required maxlength="100">
-                    </div>
-                    <div class="form-group">
-                        <label for="contrib-en">English Meaning</label>
-                        <input type="text" id="contrib-en" placeholder="e.g. path, way" required maxlength="200">
-                    </div>
-                    <div class="form-group">
-                        <label>Audio (optional)</label>
-                        <button type="button" class="btn btn-secondary btn-small" id="contrib-record-btn" onclick="toggleContribRecording()">
-                            Record Pronunciation
-                        </button>
-                        <span id="contrib-audio-status" class="hint"></span>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Submit Word</button>
-                </form>
-
-                <div id="contrib-result" class="result-box hidden"></div>
-                <div id="contrib-error" class="error-box hidden"></div>
-            </div>
-        </section>
-
-        <!-- Pipeline Status Tab -->
-        <section id="tab-pipeline" class="tab-panel">
-            <div class="card">
-                <h2>Pipeline Status</h2>
-                <p class="description">Monitor the MLOps pipeline, experiment tracking, and system health.</p>
-
-                <div class="status-grid">
-                    <div class="status-card">
-                        <h3>API Health</h3>
-                        <div id="health-status" class="status-value">Checking...</div>
-                        <div id="health-details" class="status-details"></div>
-                    </div>
-                    <div class="status-card">
-                        <h3>Model Readiness</h3>
-                        <div id="ready-status" class="status-value">Checking...</div>
-                        <div id="ready-details" class="status-details"></div>
-                    </div>
-                </div>
-
-                <div class="pipeline-links">
-                    <h3>Management Consoles</h3>
-                    <div class="link-grid">
-                        <a href="http://localhost:5000" target="_blank" class="pipeline-link">
-                            <strong>MLflow</strong>
-                            <span>Experiment tracking & model registry</span>
-                        </a>
-                        <a href="http://localhost:8080" target="_blank" class="pipeline-link">
-                            <strong>Airflow</strong>
-                            <span>Pipeline orchestration & DAG runs</span>
-                        </a>
-                        <a href="http://localhost:9090" target="_blank" class="pipeline-link">
-                            <strong>Prometheus</strong>
-                            <span>Metrics & alert rules</span>
-                        </a>
-                        <a href="http://localhost:3001" target="_blank" class="pipeline-link">
-                            <strong>Grafana</strong>
-                            <span>Dashboards & visualization</span>
-                        </a>
-                    </div>
+    <div class="app-shell">
+        <header class="titlebar">
+            <div class="titlebar-brand">
+                <span class="titlebar-led" aria-hidden="true"></span>
+                <div>
+                    <p class="titlebar-overline">Pandora Field Deck</p>
+                    <h1>Na'vi Translator</h1>
                 </div>
             </div>
-        </section>
-    </main>
+            <div class="titlebar-actions">
+                <div class="titlebar-chip" id="active-mode-chip">AUDIO MODE</div>
+                <button class="titlebar-btn" onclick="toggleHelp()" title="User Manual" aria-label="Open user manual">?</button>
+            </div>
+        </header>
 
-    <!-- Help Modal -->
+        <main class="console">
+            <section class="hero-strip">
+                <div class="hero-display">
+                    <p class="display-label">Eywa uplink</p>
+                    <div class="display-value" id="hero-mode-display">AUDIO TRANSLATION</div>
+                    <p class="hero-copy" id="hero-mode-copy">Capture spoken Na'vi and decode it into clear English.</p>
+                </div>
+
+                <div class="signal-rack">
+                    <div class="signal-module">
+                        <span class="signal-label">ASR</span>
+                        <strong>LIVE</strong>
+                        <small>Whisper capture</small>
+                    </div>
+                    <div class="signal-module">
+                        <span class="signal-label">MT</span>
+                        <strong>READY</strong>
+                        <small>Marian decode</small>
+                    </div>
+                    <div class="signal-module">
+                        <span class="signal-label">OPS</span>
+                        <strong>TRACKED</strong>
+                        <small>MLOps telemetry</small>
+                    </div>
+                </div>
+            </section>
+
+            <nav class="tab-dock" aria-label="Translator modes">
+                <button class="tab active" data-tab="audio" onclick="switchTab('audio')">
+                    <span class="tab-code">REC</span>
+                    <span class="tab-label">Translate Audio</span>
+                </button>
+                <button class="tab" data-tab="text" onclick="switchTab('text')">
+                    <span class="tab-code">TXT</span>
+                    <span class="tab-label">Translate Text</span>
+                </button>
+                <button class="tab" data-tab="contribute" onclick="switchTab('contribute')">
+                    <span class="tab-code">VOC</span>
+                    <span class="tab-label">Contribute</span>
+                </button>
+                <button class="tab" data-tab="pipeline" onclick="switchTab('pipeline')">
+                    <span class="tab-code">OPS</span>
+                    <span class="tab-label">Pipeline Status</span>
+                </button>
+            </nav>
+
+            <section class="workspace">
+                <section id="tab-audio" class="tab-panel active">
+                    <div class="panel-grid audio-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Capture Deck</p>
+                                <h2>Translate Spoken Na'vi</h2>
+                                <p class="panel-description">Arm the recorder for a live sample or load a short clip from the field.</p>
+                            </div>
+
+                            <div class="recorder-stage">
+                                <div class="meter-stack" aria-hidden="true">
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                    <span class="meter-bar"></span>
+                                </div>
+
+                                <button id="record-btn" class="btn btn-primary btn-record" onclick="toggleRecording()">
+                                    <span class="btn-code">REC</span>
+                                    <span id="record-label">Arm Recorder</span>
+                                </button>
+
+                                <div id="recording-indicator" class="recording-indicator hidden">Live input detected</div>
+                                <p class="stage-note" id="audio-action-status">Microphone standing by.</p>
+                            </div>
+
+                            <div class="separator"><span>Alt Input</span></div>
+
+                            <div class="upload-rack" id="upload-area">
+                                <input type="file" id="audio-file" accept="audio/*" onchange="handleAudioUpload(event)" hidden>
+                                <button class="btn btn-secondary" onclick="document.getElementById('audio-file').click()">
+                                    <span class="btn-code">+</span>
+                                    <span>Load Audio Sample</span>
+                                </button>
+                                <p class="hint" id="upload-status">WAV, MP3, or OGG. Short phrases work best.</p>
+                            </div>
+
+                            <div id="audio-error" class="error-box hidden"></div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Readout</p>
+                                <h2>Decoded Output</h2>
+                                <p class="panel-description">The system will transcribe the Na'vi phrase and render the English translation here.</p>
+                            </div>
+
+                            <div class="display-frame">
+                                <div id="audio-placeholder" class="result-placeholder">
+                                    Awaiting a live capture or uploaded sample.
+                                </div>
+
+                                <div id="audio-result" class="result-box hidden" data-placeholder="audio-placeholder">
+                                    <div class="result-group">
+                                        <span class="result-label">Na'vi Transcript</span>
+                                        <p id="audio-navi" class="result-value"></p>
+                                    </div>
+                                    <div class="result-group">
+                                        <span class="result-label">English Render</span>
+                                        <p id="audio-english" class="result-value result-value-accent"></p>
+                                    </div>
+                                    <div class="result-meta">
+                                        <span>Confidence <strong id="audio-confidence"></strong></span>
+                                        <span>Latency <strong id="audio-latency"></strong> ms</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section id="tab-text" class="tab-panel">
+                    <div class="panel-grid text-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Input Console</p>
+                                <h2>Translate Written Na'vi</h2>
+                                <p class="panel-description">Type a word, greeting, or sentence and send it through the translator.</p>
+                            </div>
+
+                            <div class="input-rack">
+                                <textarea id="navi-input" placeholder="Type Na'vi text here... e.g. kaltxi" rows="6" maxlength="500"></textarea>
+                                <div class="action-row">
+                                    <button id="text-translate-btn" class="btn btn-primary" onclick="translateText()">
+                                        <span class="btn-code">&gt;</span>
+                                        <span>Translate Signal</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="example-strip" aria-label="Quick examples">
+                                <button class="mini-btn" onclick="setTextExample('kaltxi')">kaltxi</button>
+                                <button class="mini-btn" onclick="setTextExample('oel ngati kameie')">oel ngati kameie</button>
+                                <button class="mini-btn" onclick="setTextExample('irayo')">irayo</button>
+                            </div>
+
+                            <div id="text-error" class="error-box hidden"></div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Semantic Map</p>
+                                <h2>Translation Breakdown</h2>
+                                <p class="panel-description">Matched words and confidence data appear here after each request.</p>
+                            </div>
+
+                            <div class="display-frame">
+                                <div id="text-placeholder" class="result-placeholder">
+                                    Send a phrase to inspect the English output and word-by-word mapping.
+                                </div>
+
+                                <div id="text-result" class="result-box hidden" data-placeholder="text-placeholder">
+                                    <div class="result-group">
+                                        <span class="result-label">English Render</span>
+                                        <p id="text-english" class="result-value result-value-accent"></p>
+                                    </div>
+                                    <div class="result-meta">
+                                        <span>Confidence <strong id="text-confidence"></strong></span>
+                                        <span>Latency <strong id="text-latency"></strong> ms</span>
+                                    </div>
+
+                                    <div class="breakdown-header">
+                                        <span class="result-label">Lexicon Match</span>
+                                    </div>
+                                    <div id="word-breakdown" class="breakdown-grid"></div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section id="tab-contribute" class="tab-panel">
+                    <div class="panel-grid contribute-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Lexicon Intake</p>
+                                <h2>Contribute a Word</h2>
+                                <p class="panel-description">Submit new vocabulary and optionally attach pronunciation audio for review.</p>
+                            </div>
+
+                            <form id="contribute-form" class="form-rack" onsubmit="submitVocab(event)">
+                                <div class="form-group">
+                                    <label for="contrib-navi">Na'vi Word</label>
+                                    <input type="text" id="contrib-navi" placeholder="e.g. fya'o" required maxlength="100">
+                                </div>
+                                <div class="form-group">
+                                    <label for="contrib-en">English Meaning</label>
+                                    <input type="text" id="contrib-en" placeholder="e.g. path, way" required maxlength="200">
+                                </div>
+                                <div class="form-group">
+                                    <label>Pronunciation Audio</label>
+                                    <div class="inline-controls">
+                                        <button type="button" class="btn btn-secondary btn-compact" id="contrib-record-btn" onclick="toggleContribRecording()">
+                                            <span class="btn-code">REC</span>
+                                            <span>Record Sample</span>
+                                        </button>
+                                        <span id="contrib-audio-status" class="hint">Optional field recording.</span>
+                                    </div>
+                                </div>
+                                <button type="submit" id="contrib-submit-btn" class="btn btn-primary">
+                                    <span class="btn-code">+</span>
+                                    <span>Submit to Review</span>
+                                </button>
+                            </form>
+
+                            <div id="contrib-error" class="error-box hidden"></div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Review Queue</p>
+                                <h2>Submission Status</h2>
+                                <p class="panel-description">Accepted words reset the form. Flagged entries stay visible so you can correct them.</p>
+                            </div>
+
+                            <div class="display-frame">
+                                <div id="contrib-placeholder" class="result-placeholder">
+                                    Nothing queued yet. The intake log will update after a submission.
+                                </div>
+                                <div id="contrib-result" class="result-box hidden" data-placeholder="contrib-placeholder"></div>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section id="tab-pipeline" class="tab-panel">
+                    <div class="panel-grid pipeline-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">System Health</p>
+                                <h2>Runtime Status</h2>
+                                <p class="panel-description">Backend health and model readiness are polled from the API when this view opens.</p>
+                            </div>
+
+                            <div class="status-grid">
+                                <div class="status-module">
+                                    <span class="status-label">API Health</span>
+                                    <div id="health-status" class="status-value">Checking...</div>
+                                    <div id="health-details" class="status-details"></div>
+                                </div>
+                                <div class="status-module">
+                                    <span class="status-label">Model Readiness</span>
+                                    <div id="ready-status" class="status-value">Checking...</div>
+                                    <div id="ready-details" class="status-details"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <p class="panel-kicker">Operator Links</p>
+                                <h2>Control Surfaces</h2>
+                                <p class="panel-description">Direct links to the experiment and monitoring tools behind the translator stack.</p>
+                            </div>
+
+                            <div class="link-grid">
+                                <a href="http://localhost:5000" target="_blank" class="pipeline-link">
+                                    <strong>MLflow</strong>
+                                    <span>Experiments and registry</span>
+                                </a>
+                                <a href="http://localhost:8080" target="_blank" class="pipeline-link">
+                                    <strong>Airflow</strong>
+                                    <span>DAG runs and orchestration</span>
+                                </a>
+                                <a href="http://localhost:9090" target="_blank" class="pipeline-link">
+                                    <strong>Prometheus</strong>
+                                    <span>Metrics and alert rules</span>
+                                </a>
+                                <a href="http://localhost:3001" target="_blank" class="pipeline-link">
+                                    <strong>Grafana</strong>
+                                    <span>Dashboards and telemetry</span>
+                                </a>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+            </section>
+
+            <footer class="transport-bar">
+                <div class="transport-readout">
+                    <span class="transport-label">Deck Status</span>
+                    <strong id="footer-status">FIELD CONSOLE NOMINAL</strong>
+                </div>
+                <div class="transport-meta">
+                    <span>Whisper</span>
+                    <span>MarianMT</span>
+                    <span>MLOps</span>
+                </div>
+            </footer>
+        </main>
+    </div>
+
     <div id="help-modal" class="modal hidden">
         <div class="modal-content">
-            <button class="modal-close" onclick="toggleHelp()">&times;</button>
-            <h2>User Manual</h2>
+            <button class="modal-close" onclick="toggleHelp()" aria-label="Close user manual">X</button>
+            <p class="panel-kicker">Operator Manual</p>
+            <h2>How to Use the Translator</h2>
 
-            <h3>Translate Audio</h3>
-            <p>Click <strong>Start Recording</strong> and speak a Na'vi word or phrase.
-               Click <strong>Stop Recording</strong> when done. The system transcribes
-               your speech and translates it to English.</p>
-            <p>You can also upload a pre-recorded audio file (WAV, MP3, or OGG, max 30 seconds).</p>
+            <section class="modal-section">
+                <h3>Translate Audio</h3>
+                <p>Arm the recorder, speak a short Na'vi phrase, then stop the capture. You can also load an audio file if you already have a recording.</p>
+            </section>
 
-            <h3>Translate Text</h3>
-            <p>Type any Na'vi text in the text box and click <strong>Translate</strong>.
-               You'll get the English translation plus a word-by-word breakdown showing
-               which words were found in the dictionary.</p>
+            <section class="modal-section">
+                <h3>Translate Text</h3>
+                <p>Type any Na'vi phrase and launch the translation signal. The readout includes the English output plus a word-level lexicon match.</p>
+            </section>
 
-            <h3>Contribute</h3>
-            <p>Help improve the translator by submitting new Na'vi words. Enter the
-               Na'vi word, its English meaning, and optionally record the pronunciation.
-               Submissions are reviewed before being added to the training data.</p>
+            <section class="modal-section">
+                <h3>Contribute</h3>
+                <p>Submit new words to help grow the dictionary. Pronunciation audio is optional and will be reviewed alongside the text entry.</p>
+            </section>
 
-            <h3>Pipeline Status</h3>
-            <p>View the health of the API, model loading status, and links to the
-               management consoles (MLflow, Airflow, Prometheus, Grafana).</p>
-
-            <h3>About</h3>
-            <p>Na'vi Translator is an MLOps project for DA6360. It uses Whisper for
-               speech recognition and MarianMT for translation, with automated
-               retraining when data drift is detected.</p>
+            <section class="modal-section">
+                <h3>Pipeline Status</h3>
+                <p>Open the runtime view to inspect backend health, model readiness, and the linked tooling used to operate the training and serving stack.</p>
+            </section>
         </div>
     </div>
 

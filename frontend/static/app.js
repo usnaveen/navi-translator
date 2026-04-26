@@ -1,46 +1,73 @@
-/* =============================================================================
-   Na'vi Translator — Frontend JavaScript
-   =============================================================================
-   All API calls go through /api/* which nginx proxies to the backend.
-   This keeps the frontend and backend strictly decoupled.
-   ============================================================================= */
-
 const API_BASE = '/api';
 
-// --- Tab Switching ---
+const TAB_META = {
+    audio: {
+        chip: 'AUDIO MODE',
+        title: 'AUDIO TRANSLATION',
+        copy: 'Capture spoken Na\'vi and decode it into clear English.',
+        footer: 'FIELD CONSOLE NOMINAL'
+    },
+    text: {
+        chip: 'TEXT MODE',
+        title: 'TEXT TRANSLATION',
+        copy: 'Inspect written Na\'vi with a clean English render and lexical breakdown.',
+        footer: 'TEXT CHANNEL LOCKED'
+    },
+    contribute: {
+        chip: 'INTAKE MODE',
+        title: 'LEXICON INTAKE',
+        copy: 'Feed new vocabulary into the review queue and grow the translator corpus.',
+        footer: 'REVIEW QUEUE READY'
+    },
+    pipeline: {
+        chip: 'OPS MODE',
+        title: 'PIPELINE STATUS',
+        copy: 'Monitor runtime health, model readiness, and the surrounding MLOps stack.',
+        footer: 'OPERATIONS SURFACE ACTIVE'
+    }
+};
+
 function switchTab(tabName) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
+
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
     document.getElementById(`tab-${tabName}`).classList.add('active');
 
-    // Refresh health status when switching to pipeline tab
+    syncTabMeta(tabName);
+
     if (tabName === 'pipeline') {
         checkHealth();
         checkReady();
     }
 }
 
-// --- Help Modal ---
+function syncTabMeta(tabName) {
+    const meta = TAB_META[tabName];
+    if (!meta) return;
+
+    document.getElementById('active-mode-chip').textContent = meta.chip;
+    document.getElementById('hero-mode-display').textContent = meta.title;
+    document.getElementById('hero-mode-copy').textContent = meta.copy;
+    document.getElementById('footer-status').textContent = meta.footer;
+    document.body.dataset.activeTab = tabName;
+}
+
 function toggleHelp() {
     document.getElementById('help-modal').classList.toggle('hidden');
 }
 
-// Close modal on outside click
-document.addEventListener('click', (e) => {
+document.addEventListener('click', (event) => {
     const modal = document.getElementById('help-modal');
-    if (e.target === modal) modal.classList.add('hidden');
+    if (event.target === modal) modal.classList.add('hidden');
 });
 
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') document.getElementById('help-modal').classList.add('hidden');
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        document.getElementById('help-modal').classList.add('hidden');
+    }
 });
 
-
-// =============================================================================
-// Audio Recording (uses MediaRecorder API)
-// =============================================================================
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
@@ -54,26 +81,30 @@ async function toggleRecording() {
 }
 
 async function startRecording() {
+    hideError('audio-error');
+
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) audioChunks.push(event.data);
         };
 
         mediaRecorder.onstop = () => {
             const blob = new Blob(audioChunks, { type: 'audio/wav' });
-            stream.getTracks().forEach(t => t.stop());
+            stream.getTracks().forEach((track) => track.stop());
+            setText('audio-action-status', 'Signal captured. Decoding waveform...');
             translateAudio(blob);
         };
 
         mediaRecorder.start();
         isRecording = true;
         updateRecordingUI(true);
-    } catch (err) {
+    } catch {
         showError('audio-error', 'Microphone access denied. Please allow microphone access.');
+        setText('audio-action-status', 'Microphone unavailable.');
     }
 }
 
@@ -86,35 +117,29 @@ function stopRecording() {
 }
 
 function updateRecordingUI(recording) {
-    const btn = document.getElementById('record-btn');
+    const button = document.getElementById('record-btn');
     const label = document.getElementById('record-label');
     const indicator = document.getElementById('recording-indicator');
 
-    if (recording) {
-        btn.classList.add('recording');
-        label.textContent = 'Stop Recording';
-        indicator.classList.remove('hidden');
-    } else {
-        btn.classList.remove('recording');
-        label.textContent = 'Start Recording';
-        indicator.classList.add('hidden');
-    }
+    button.classList.toggle('recording', recording);
+    label.textContent = recording ? 'Stop Capture' : 'Arm Recorder';
+    indicator.classList.toggle('hidden', !recording);
+    setText('audio-action-status', recording ? 'Listening for Na\'vi speech...' : 'Microphone standing by.');
 }
 
 function handleAudioUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+
+    setText('upload-status', `Loaded sample: ${file.name}`);
+    setText('audio-action-status', 'Audio file loaded. Decoding waveform...');
     translateAudio(file);
 }
-
-
-// =============================================================================
-// Translation API Calls
-// =============================================================================
 
 async function translateAudio(audioBlob) {
     hideError('audio-error');
     hideResult('audio-result');
+    setButtonDisabled('record-btn', true);
 
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.wav');
@@ -131,13 +156,17 @@ async function translateAudio(audioBlob) {
         }
 
         const data = await response.json();
-        document.getElementById('audio-navi').textContent = data.navi_text;
-        document.getElementById('audio-english').textContent = data.english;
-        document.getElementById('audio-confidence').textContent = `${(data.confidence * 100).toFixed(1)}%`;
-        document.getElementById('audio-latency').textContent = data.latency_ms;
+        setText('audio-navi', data.navi_text);
+        setText('audio-english', data.english);
+        setText('audio-confidence', `${(data.confidence * 100).toFixed(1)}%`);
+        setText('audio-latency', data.latency_ms);
+        setText('audio-action-status', 'Translation locked. Readout updated.');
         showResult('audio-result');
     } catch (err) {
-        showError('audio-error', `Translation failed: ${err.message}`);
+        showError('audio-error', `Translation failed: ${getErrorMessage(err)}`);
+        setText('audio-action-status', 'Capture failed. Check the input and try again.');
+    } finally {
+        setButtonDisabled('record-btn', false);
     }
 }
 
@@ -147,6 +176,7 @@ async function translateText() {
 
     hideError('text-error');
     hideResult('text-result');
+    setBusyLabel('text-translate-btn', 'Working...');
 
     try {
         const response = await fetch(`${API_BASE}/translate/text`, {
@@ -161,20 +191,19 @@ async function translateText() {
         }
 
         const data = await response.json();
-        document.getElementById('text-english').textContent = data.english;
-        document.getElementById('text-confidence').textContent = `${(data.confidence * 100).toFixed(1)}%`;
-        document.getElementById('text-latency').textContent = data.latency_ms;
+        setText('text-english', data.english);
+        setText('text-confidence', `${(data.confidence * 100).toFixed(1)}%`);
+        setText('text-latency', data.latency_ms);
 
-        // Render word breakdown
         const grid = document.getElementById('word-breakdown');
         grid.innerHTML = '';
         if (data.word_breakdown && data.word_breakdown.length > 0) {
-            data.word_breakdown.forEach(w => {
+            data.word_breakdown.forEach((word) => {
                 const card = document.createElement('div');
-                card.className = `word-card ${w.found ? '' : 'not-found'}`;
+                card.className = `word-card ${word.found ? '' : 'not-found'}`;
                 card.innerHTML = `
-                    <div class="navi">${escapeHtml(w.navi)}</div>
-                    <div class="en">${escapeHtml(w.en)}</div>
+                    <div class="navi">${escapeHtml(word.navi)}</div>
+                    <div class="en">${escapeHtml(word.en)}</div>
                 `;
                 grid.appendChild(card);
             });
@@ -182,63 +211,54 @@ async function translateText() {
 
         showResult('text-result');
     } catch (err) {
-        showError('text-error', `Translation failed: ${err.message}`);
+        showError('text-error', `Translation failed: ${getErrorMessage(err)}`);
+    } finally {
+        resetBusyLabel('text-translate-btn', '&gt;', 'Translate Signal');
     }
 }
 
-// Allow Enter key to submit (Shift+Enter for newline)
-document.addEventListener('DOMContentLoaded', () => {
+function setTextExample(text) {
     const input = document.getElementById('navi-input');
-    if (input) {
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                translateText();
-            }
-        });
-    }
-    // Initial health check
-    checkHealth();
-    checkReady();
-});
-
-
-// =============================================================================
-// Vocabulary Contribution
-// =============================================================================
+    input.value = text;
+    input.focus();
+}
 
 let contribAudioBlob = null;
 let contribRecorder = null;
 let contribRecording = false;
 
 async function toggleContribRecording() {
+    hideError('contrib-error');
+
     if (contribRecording) {
         contribRecorder.stop();
         contribRecording = false;
-        document.getElementById('contrib-record-btn').textContent = 'Record Pronunciation';
-    } else {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            contribRecorder = new MediaRecorder(stream);
-            const chunks = [];
+        setInlineButton('contrib-record-btn', 'REC', 'Record Sample');
+        return;
+    }
 
-            contribRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) chunks.push(e.data);
-            };
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        contribRecorder = new MediaRecorder(stream);
+        const chunks = [];
 
-            contribRecorder.onstop = () => {
-                contribAudioBlob = new Blob(chunks, { type: 'audio/wav' });
-                stream.getTracks().forEach(t => t.stop());
-                document.getElementById('contrib-audio-status').textContent = 'Audio recorded';
-            };
+        contribRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) chunks.push(event.data);
+        };
 
-            contribRecorder.start();
-            contribRecording = true;
-            document.getElementById('contrib-record-btn').textContent = 'Stop Recording';
-            document.getElementById('contrib-audio-status').textContent = 'Recording...';
-        } catch (err) {
-            showError('contrib-error', 'Microphone access denied.');
-        }
+        contribRecorder.onstop = () => {
+            contribAudioBlob = new Blob(chunks, { type: 'audio/wav' });
+            stream.getTracks().forEach((track) => track.stop());
+            setText('contrib-audio-status', 'Pronunciation sample captured.');
+        };
+
+        contribRecorder.start();
+        contribRecording = true;
+        setInlineButton('contrib-record-btn', 'STOP', 'Stop Capture');
+        setText('contrib-audio-status', 'Recording pronunciation...');
+    } catch {
+        showError('contrib-error', 'Microphone access denied.');
+        setText('contrib-audio-status', 'Microphone unavailable.');
     }
 }
 
@@ -246,6 +266,7 @@ async function submitVocab(event) {
     event.preventDefault();
     hideError('contrib-error');
     hideResult('contrib-result');
+    setBusyLabel('contrib-submit-btn', 'Submitting...');
 
     const naviWord = document.getElementById('contrib-navi').value.trim();
     const enMeaning = document.getElementById('contrib-en').value.trim();
@@ -256,12 +277,13 @@ async function submitVocab(event) {
         audio_b64: null,
     };
 
-    // Convert audio to base64 if recorded
     if (contribAudioBlob) {
         const buffer = await contribAudioBlob.arrayBuffer();
         const bytes = new Uint8Array(buffer);
         let binary = '';
-        bytes.forEach(b => binary += String.fromCharCode(b));
+        bytes.forEach((byte) => {
+            binary += String.fromCharCode(byte);
+        });
         body.audio_b64 = btoa(binary);
     }
 
@@ -275,23 +297,20 @@ async function submitVocab(event) {
         const data = await response.json();
         const resultEl = document.getElementById('contrib-result');
         resultEl.textContent = data.message;
-        resultEl.style.color = data.accepted ? 'var(--success)' : 'var(--warning)';
+        resultEl.style.color = data.accepted ? '#60ff94' : '#ffd07a';
         showResult('contrib-result');
 
         if (data.accepted) {
             document.getElementById('contribute-form').reset();
             contribAudioBlob = null;
-            document.getElementById('contrib-audio-status').textContent = '';
+            setText('contrib-audio-status', 'Optional field recording.');
         }
     } catch (err) {
-        showError('contrib-error', `Submission failed: ${err.message}`);
+        showError('contrib-error', `Submission failed: ${getErrorMessage(err)}`);
+    } finally {
+        resetBusyLabel('contrib-submit-btn', '+', 'Submit to Review');
     }
 }
-
-
-// =============================================================================
-// Pipeline Status
-// =============================================================================
 
 async function checkHealth() {
     const statusEl = document.getElementById('health-status');
@@ -331,17 +350,22 @@ async function checkReady() {
     }
 }
 
-
-// =============================================================================
-// Utilities
-// =============================================================================
-
 function showResult(id) {
-    document.getElementById(id).classList.remove('hidden');
+    const result = document.getElementById(id);
+    const placeholderId = result.dataset.placeholder;
+    result.classList.remove('hidden');
+    if (placeholderId) {
+        document.getElementById(placeholderId).classList.add('hidden');
+    }
 }
 
 function hideResult(id) {
-    document.getElementById(id).classList.add('hidden');
+    const result = document.getElementById(id);
+    const placeholderId = result.dataset.placeholder;
+    result.classList.add('hidden');
+    if (placeholderId) {
+        document.getElementById(placeholderId).classList.remove('hidden');
+    }
 }
 
 function showError(id, message) {
@@ -359,3 +383,48 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+function setText(id, value) {
+    document.getElementById(id).textContent = value;
+}
+
+function setButtonDisabled(id, disabled) {
+    document.getElementById(id).disabled = disabled;
+}
+
+function setBusyLabel(id, text) {
+    const button = document.getElementById(id);
+    button.disabled = true;
+    button.innerHTML = `<span>${text}</span>`;
+}
+
+function resetBusyLabel(id, code, text) {
+    const button = document.getElementById(id);
+    button.disabled = false;
+    button.innerHTML = `<span class="btn-code">${code}</span><span>${text}</span>`;
+}
+
+function setInlineButton(id, code, text) {
+    document.getElementById(id).innerHTML = `<span class="btn-code">${code}</span><span>${text}</span>`;
+}
+
+function getErrorMessage(err) {
+    return err instanceof Error ? err.message : 'Unexpected error';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    syncTabMeta('audio');
+
+    const input = document.getElementById('navi-input');
+    if (input) {
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                translateText();
+            }
+        });
+    }
+
+    checkHealth();
+    checkReady();
+});
