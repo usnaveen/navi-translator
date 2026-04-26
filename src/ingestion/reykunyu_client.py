@@ -102,10 +102,19 @@ def _extract_word(entry: dict) -> dict | None:
     navi = entry.get("na'vi") or entry.get("navi") or entry.get("word", "")
     navi = navi.strip() if isinstance(navi, str) else ""
 
-    # English meaning lives inside the translations list
+    # English meaning can appear either in the normalized "en" field used by
+    # tests/fixtures, or inside Reykunyu's translations collection.
     en = ""
+    raw_en = entry.get("en")
+    if isinstance(raw_en, str):
+        en = raw_en.strip()
+    elif isinstance(raw_en, list):
+        en = "; ".join(str(item).strip() for item in raw_en if str(item).strip())
+    elif isinstance(raw_en, dict):
+        en = str(raw_en.get("en", "")).strip()
+
     translations = entry.get("translations", [])
-    if isinstance(translations, list):
+    if not en and isinstance(translations, list):
         # Collect the English gloss from every translation object
         meanings = []
         for t in translations:
@@ -114,7 +123,7 @@ def _extract_word(entry: dict) -> dict | None:
                 if meaning:
                     meanings.append(meaning)
         en = "; ".join(meanings)
-    elif isinstance(translations, dict):
+    elif not en and isinstance(translations, dict):
         # Older format: translations is a plain dict { "en": "...", ... }
         en = translations.get("en", "").strip()
 
@@ -128,6 +137,17 @@ def _extract_word(entry: dict) -> dict | None:
         "en": en,
         "type": word_type,
     }
+
+
+def validate_words(words: list[dict]) -> list[dict]:
+    """Return entries that contain the required normalized fields."""
+    valid = []
+    for entry in words:
+        if entry.get("navi") and entry.get("en"):
+            valid.append(entry)
+        else:
+            logger.debug("Skipping invalid word entry: %s", entry)
+    return valid
 
 
 def lookup_word(word: str, words: list[dict]) -> dict | None:

@@ -61,7 +61,20 @@ def compute_mfcc_baselines(audio_dir: Path, manifest: list[dict], sr: int) -> di
             mean_mfccs = np.mean(mfccs, axis=1)
             all_mfccs.append(mean_mfccs)
         except Exception as e:
-            logger.warning("Failed to compute MFCC for %s: %s", filepath.name, e)
+            try:
+                mean_mfccs = compute_spectral_baseline(filepath, sr)
+                all_mfccs.append(mean_mfccs)
+                logger.warning(
+                    "MFCC failed for %s, used spectral fallback: %s",
+                    filepath.name,
+                    e,
+                )
+            except Exception as fallback_error:
+                logger.warning(
+                    "Failed to compute audio baseline for %s: %s",
+                    filepath.name,
+                    fallback_error,
+                )
 
     if not all_mfccs:
         return {"mean": [0.0] * 13, "std": [0.0] * 13, "count": 0}
@@ -72,6 +85,29 @@ def compute_mfcc_baselines(audio_dir: Path, manifest: list[dict], sr: int) -> di
         "std": np.std(all_mfccs, axis=0).tolist(),
         "count": len(all_mfccs),
     }
+
+
+def compute_spectral_baseline(filepath: Path, sr: int) -> np.ndarray:
+    """Compute a 13-dimensional audio baseline when librosa MFCC is unavailable."""
+    import soundfile as sf
+
+    audio, file_sr = sf.read(str(filepath), dtype="float32")
+    if audio.ndim > 1:
+        audio = np.mean(audio, axis=1)
+
+    if file_sr != sr and len(audio) > 1:
+        original_x = np.linspace(0, 1, num=len(audio), endpoint=False)
+        target_len = max(1, int(len(audio) * sr / file_sr))
+        target_x = np.linspace(0, 1, num=target_len, endpoint=False)
+        audio = np.interp(target_x, original_x, audio).astype(np.float32)
+
+    if len(audio) == 0:
+        return np.zeros(13, dtype=np.float32)
+
+    spectrum = np.abs(np.fft.rfft(audio))
+    log_spectrum = np.log1p(spectrum)
+    bins = np.array_split(log_spectrum, 13)
+    return np.array([float(np.mean(bin_values)) if len(bin_values) else 0.0 for bin_values in bins])
 
 
 def compute_oov_rate(val_pairs_path: Path, words_path: Path) -> dict:

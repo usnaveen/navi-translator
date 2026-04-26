@@ -1,0 +1,158 @@
+schema: '2.0'
+stages:
+  baseline_stats:
+    cmd: python src/preprocessing/baseline_stats.py
+    deps:
+    - path: data/processed/train
+      hash: md5
+      md5: c09f7d5c85cbe69276a744e9932496aa.dir
+      size: 121932
+      nfiles: 2
+    - path: data/processed/val
+      hash: md5
+      md5: 319983ecf24f66e690ba2cdb9fd48bce.dir
+      size: 15418
+      nfiles: 2
+    - path: data/raw/words.json
+      hash: md5
+      md5: aaba56ba10ae2b66c2616f1e31797a68
+      size: 269376
+    - path: src/preprocessing/baseline_stats.py
+      hash: md5
+      md5: 3e49146891bd76672454a3f0410eca5b
+      size: 7960
+    outs:
+    - path: baselines.json
+      hash: md5
+      md5: 23ee3bf28960cf6f1f0b9be4f1e79788
+      size: 1006
+    - path: data/processed/baseline_plots
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+  ingest:
+    cmd: python src/ingestion/data_ingest.py
+    deps:
+    - path: src/ingestion/data_ingest.py
+      hash: md5
+      md5: 89ae1c1e7ec28c07d2bf57fc81c4c7e2
+      size: 4575
+    - path: src/ingestion/reykunyu_client.py
+      hash: md5
+      md5: 92671b51d2558838a7d874f06dbf6f02
+      size: 5116
+    - path: src/ingestion/tts_generate.py
+      hash: md5
+      md5: 144a131a6cf2b457781b373d3f68eab4
+      size: 3877
+    params:
+      params.yaml:
+        data.audio_sample_rate: 16000
+        data.reykunyu_words_url: https://reykunyu.lu/words.json
+        tts.engine: gtts
+        tts.language: id
+    outs:
+    - path: data/raw/audio
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+    - path: data/raw/words.json
+      hash: md5
+      md5: aaba56ba10ae2b66c2616f1e31797a68
+      size: 269376
+    - path: data/synthetic
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+  preprocess_text:
+    cmd: python src/preprocessing/build_pairs.py
+    deps:
+    - path: data/raw/words.json
+      hash: md5
+      md5: aaba56ba10ae2b66c2616f1e31797a68
+      size: 269376
+    - path: src/preprocessing/build_pairs.py
+      hash: md5
+      md5: 5cfc0764b8388929f16c6b36267427b3
+      size: 4822
+    params:
+      params.yaml:
+        marian.max_source_length: 128
+        marian.max_target_length: 128
+    outs:
+    - path: data/processed/text
+      hash: md5
+      md5: 4f1b744da0db3995bad382470a6afab9.dir
+      size: 141405
+      nfiles: 1
+  preprocess_audio:
+    cmd: python src/preprocessing/audio_features.py
+    deps:
+    - path: data/raw/audio
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+    - path: data/synthetic
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0
+    - path: src/preprocessing/audio_features.py
+      hash: md5
+      md5: b6cf74495ad3d3e273a6767329d9dfd3
+      size: 5327
+    params:
+      params.yaml:
+        data.audio_channels: 1
+        data.audio_sample_rate: 16000
+        data.max_audio_duration: 10.0
+        data.min_audio_duration: 0.3
+    outs:
+    - path: data/processed/audio
+      hash: md5
+      md5: 5aa9d0c55677065b641d13ab574962d3.dir
+      size: 4468484
+      nfiles: 58
+  split:
+    cmd: python src/preprocessing/split_data.py
+    deps:
+    - path: data/processed/audio
+      hash: md5
+      md5: 5aa9d0c55677065b641d13ab574962d3.dir
+      size: 4468484
+      nfiles: 58
+    - path: data/processed/text
+      hash: md5
+      md5: 4f1b744da0db3995bad382470a6afab9.dir
+      size: 141405
+      nfiles: 1
+    - path: src/preprocessing/split_data.py
+      hash: md5
+      md5: 4f2c89aea3caa81c1c40a0d921452cb7
+      size: 6858
+    params:
+      params.yaml:
+        split.random_seed: 42
+        split.test_ratio: 0.1
+        split.train_ratio: 0.8
+        split.val_ratio: 0.1
+    outs:
+    - path: data/processed/test
+      hash: md5
+      md5: b1d4c01dbdea8afb90d860bf46b009ad.dir
+      size: 15828
+      nfiles: 2
+    - path: data/processed/train
+      hash: md5
+      md5: c09f7d5c85cbe69276a744e9932496aa.dir
+      size: 121932
+      nfiles: 2
+    - path: data/processed/val
+      hash: md5
+      md5: 319983ecf24f66e690ba2cdb9fd48bce.dir
+      size: 15418
+      nfiles: 2

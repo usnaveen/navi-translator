@@ -31,12 +31,12 @@ whisper:
     - "q_proj"
     - "v_proj"
   learning_rate: 1.0e-4
-  batch_size: 4
-  num_epochs: 5
+  batch_size: 1
+  num_epochs: 10
   warmup_steps: 100
   eval_steps: 200
   early_stopping_patience: 3
-  language: "na"              # Na'vi ISO code approximation
+  language: "mi"              # Maori — closest Whisper-supported language to Na'vi (Polynesian phonology)
   target_wer: 0.35
 
 # --- MarianMT NMT (Na'vi → English Translation) ---
@@ -53,7 +53,7 @@ marian:
 
 # --- MLflow ---
 mlflow:
-  tracking_uri: "http://localhost:5000"
+  tracking_uri: "file:///Users/naveenus/Downloads/navi-translator/mlruns"
   experiment_name: "navi-translator"
   model_registry_name_whisper: "navi-whisper"
   model_registry_name_marian: "navi-marian"

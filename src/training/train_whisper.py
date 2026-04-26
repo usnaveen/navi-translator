@@ -208,6 +208,9 @@ def main():
         )
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
+        # Required when combining PEFT/LoRA with gradient_checkpointing —
+        # makes the (frozen) input embeddings produce gradients so backward works.
+        model.enable_input_require_grads()
 
         # Log LoRA params
         mlflow.log_params({
@@ -257,6 +260,8 @@ def main():
             output_dir=str(output_dir),
             per_device_train_batch_size=whisper_params["batch_size"],
             per_device_eval_batch_size=whisper_params["batch_size"],
+            gradient_accumulation_steps=4,        # effective batch 4 with ~1/4 the memory
+            gradient_checkpointing=True,          # trade compute for memory
             learning_rate=whisper_params["learning_rate"],
             warmup_steps=whisper_params["warmup_steps"],
             num_train_epochs=whisper_params["num_epochs"],
@@ -264,6 +269,7 @@ def main():
             eval_steps=whisper_params["eval_steps"],
             save_strategy="steps",
             save_steps=whisper_params["eval_steps"],
+            save_total_limit=2,          # keep only best + latest checkpoint (saves disk)
             load_best_model_at_end=True,
             metric_for_best_model="wer",
             greater_is_better=False,
