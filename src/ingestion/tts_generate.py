@@ -11,7 +11,6 @@ Key learning points:
 - Each word gets its own audio file, named by the Na'vi word
 """
 
-import json
 import logging
 import re
 from io import BytesIO

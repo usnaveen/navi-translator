@@ -110,7 +110,7 @@ def write_pairs_tsv(pairs: list[tuple[str, str]], output_path: Path) -> None:
 
 
 def main():
-    params = load_params()
+    load_params()
     words_path = PROJECT_ROOT / "data" / "raw" / "words.json"
     output_dir = PROJECT_ROOT / "data" / "processed" / "text"
 

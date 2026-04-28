@@ -1,10 +1,7 @@
 """Unit tests for the Reykunyu client."""
 
-import json
-import tempfile
-from pathlib import Path
 
-from src.ingestion.reykunyu_client import _extract_word, lookup_word, validate_words
+from src.ingestion.reykunyu_client import _extract_word, lookup_word
 
 
 def validate_words(words):

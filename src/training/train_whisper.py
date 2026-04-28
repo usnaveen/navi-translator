@@ -25,17 +25,13 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-import torch
 import yaml
 from datasets import Dataset
 from transformers import (
-    EarlyStoppingCallback,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
-    WhisperFeatureExtractor,
     WhisperForConditionalGeneration,
     WhisperProcessor,
-    WhisperTokenizer,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -157,7 +153,7 @@ def compute_wer_metric(pred, tokenizer):
     label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
 
     # Filter empty strings
-    pairs = [(p, l) for p, l in zip(pred_str, label_str) if l.strip()]
+    pairs = [(p, lab) for p, lab in zip(pred_str, label_str) if lab.strip()]
     if not pairs:
         return {"wer": 1.0}
 
@@ -183,7 +179,7 @@ def main():
     mlflow.set_tracking_uri(mlflow_params["tracking_uri"])
     mlflow.set_experiment(mlflow_params["experiment_name"])
 
-    with mlflow.start_run(run_name="whisper-lora-finetune") as run:
+    with mlflow.start_run(run_name="whisper-lora-finetune"):
         # Log dataset version
         mlflow.log_param("dataset_version", "local")
         mlflow.log_param("model_type", "whisper")

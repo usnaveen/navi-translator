@@ -20,7 +20,6 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -86,7 +85,6 @@ def run_evidently_drift_report(
     """
     try:
         import pandas as pd
-        from evidently import ColumnMapping
         from evidently.report import Report
         from evidently.metric_preset import DataDriftPreset
 

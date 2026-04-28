@@ -1,11 +1,6 @@
 """Unit tests for Prometheus metric registration."""
 
 from src.monitoring.prometheus_exporter import (
-    FALLBACK_RATE,
-    OOV_RATE,
-    TRANSLATION_LATENCY,
-    TRANSLATION_REQUESTS,
-    VOCAB_SUBMISSIONS,
     get_metrics,
     record_translation,
     record_vocab_submission,

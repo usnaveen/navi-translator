@@ -25,14 +25,12 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-import torch
 import yaml
 from datasets import Dataset
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
     DataCollatorForSeq2Seq,
-    EarlyStoppingCallback,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
 )
@@ -87,7 +85,7 @@ def preprocess_function(examples, tokenizer, max_source_length, max_target_lengt
 
     # Replace pad token id with -100 so it's ignored in loss
     labels["input_ids"] = [
-        [(l if l != tokenizer.pad_token_id else -100) for l in label]
+        [(tok if tok != tokenizer.pad_token_id else -100) for tok in label]
         for label in labels["input_ids"]
     ]
 
@@ -134,7 +132,7 @@ def main():
     mlflow.set_tracking_uri(mlflow_params["tracking_uri"])
     mlflow.set_experiment(mlflow_params["experiment_name"])
 
-    with mlflow.start_run(run_name="marian-navi-en-finetune") as run:
+    with mlflow.start_run(run_name="marian-navi-en-finetune"):
         mlflow.log_param("model_type", "marian")
         mlflow.log_param("dataset_version", "local")
 

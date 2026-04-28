@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 
 import mlflow
-import numpy as np
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -155,12 +154,14 @@ def check_and_promote(
         registry_name = mlflow_params["model_registry_name_whisper"]
         threshold = mlflow_params["promotion_threshold_wer"]
         metric_name = "wer"
-        better = lambda new, old: old - new >= threshold  # lower is better
+        def better(new, old):
+            return old - new >= threshold  # lower is better
     else:
         registry_name = mlflow_params["model_registry_name_marian"]
         threshold = mlflow_params["promotion_threshold_bleu"]
         metric_name = "bleu"
-        better = lambda new, old: new - old >= threshold  # higher is better
+        def better(new, old):
+            return new - old >= threshold  # higher is better
 
     # Try to get current production model's metric
     try:
