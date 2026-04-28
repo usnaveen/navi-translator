@@ -201,6 +201,73 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Recording flow ---
+function pickRecorderMimeType() {
+    const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+    ];
+    for (const t of candidates) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+    }
+    return '';
+}
+
+async function convertToWav(blob, targetSampleRate = 16000) {
+    const arrayBuffer = await blob.arrayBuffer();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const tmpCtx = new AudioCtx();
+    const decoded = await tmpCtx.decodeAudioData(arrayBuffer.slice(0));
+    tmpCtx.close();
+
+    const length = Math.ceil(decoded.duration * targetSampleRate);
+    const offline = new OfflineAudioContext(1, length, targetSampleRate);
+    const monoBuffer = offline.createBuffer(1, decoded.length, decoded.sampleRate);
+    const monoData = monoBuffer.getChannelData(0);
+    for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+        const chData = decoded.getChannelData(ch);
+        for (let i = 0; i < chData.length; i++) {
+            monoData[i] += chData[i] / decoded.numberOfChannels;
+        }
+    }
+    const src = offline.createBufferSource();
+    src.buffer = monoBuffer;
+    src.connect(offline.destination);
+    src.start();
+    const rendered = await offline.startRendering();
+    return encodeWav(rendered.getChannelData(0), targetSampleRate);
+}
+
+function encodeWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        offset += 2;
+    }
+    return new Blob([buffer], { type: 'audio/wav' });
+}
+
 async function toggleRecording() {
     if (isRecording) {
         stopRecording();
@@ -216,7 +283,8 @@ async function startRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         activeStream = stream;
-        mediaRecorder = new MediaRecorder(stream);
+        const mimeType = pickRecorderMimeType();
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
         audioChunks = [];
 
         mediaRecorder.ondataavailable = (event) => {
@@ -224,16 +292,22 @@ async function startRecording() {
         };
 
         mediaRecorder.onstop = async () => {
-            const blob = new Blob(audioChunks, { type: 'audio/wav' });
+            const recordedBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
             stream.getTracks().forEach((track) => track.stop());
             activeStream = null;
             stopVisualizer();
-            setPlaybackSource(blob);
-            const samples = await decodeBlobToSamples(blob);
-            if (samples) { staticWaveformData = samples; drawStaticWaveform(samples); }
-            else drawIdleWaveform();
-            setText('audio-action-status', 'Signal captured. Decoding waveform...');
-            translateAudio(blob);
+            setText('audio-action-status', 'Signal captured. Converting to WAV...');
+            try {
+                const wavBlob = await convertToWav(recordedBlob, 16000);
+                setPlaybackSource(wavBlob);
+                const samples = await decodeBlobToSamples(wavBlob);
+                if (samples) { staticWaveformData = samples; drawStaticWaveform(samples); }
+                else drawIdleWaveform();
+                translateAudio(wavBlob);
+            } catch (e) {
+                showError('audio-error', 'Audio conversion failed: ' + (e.message || e));
+                setText('audio-action-status', 'Audio conversion failed.');
+            }
         };
 
         mediaRecorder.start();
@@ -385,17 +459,24 @@ async function toggleContribRecording() {
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        contribRecorder = new MediaRecorder(stream);
+        const mimeType = pickRecorderMimeType();
+        contribRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
         const chunks = [];
 
         contribRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) chunks.push(event.data);
         };
 
-        contribRecorder.onstop = () => {
-            contribAudioBlob = new Blob(chunks, { type: 'audio/wav' });
+        contribRecorder.onstop = async () => {
+            const raw = new Blob(chunks, { type: contribRecorder.mimeType || 'audio/webm' });
             stream.getTracks().forEach((track) => track.stop());
-            setText('contrib-audio-status', 'Pronunciation sample captured.');
+            try {
+                contribAudioBlob = await convertToWav(raw, 16000);
+                setText('contrib-audio-status', 'Pronunciation sample captured.');
+            } catch (e) {
+                showError('contrib-error', 'Audio conversion failed: ' + (e.message || e));
+                setText('contrib-audio-status', 'Audio conversion failed.');
+            }
         };
 
         contribRecorder.start();
