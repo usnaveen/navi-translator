@@ -55,7 +55,7 @@ services:
       --port 5000
       --backend-store-uri /mlflow/mlruns
       --default-artifact-root /mlflow/mlartifacts
-      --allowed-hosts mlflow,localhost,127.0.0.1
+      --allowed-hosts mlflow,localhost,127.0.0.1,localhost:5001,127.0.0.1:5001
     networks:
       - navi-net
 
