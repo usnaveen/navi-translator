@@ -22,6 +22,7 @@ python-multipart==0.0.9
 pydantic==2.7.0
 
 prometheus-client==0.20.0
+psutil>=5.9.0
 
 # --- MLflow client (lookup only, no server deps) ---
-mlflow-skinny==2.10.2
+mlflow-skinny==3.11.1

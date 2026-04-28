@@ -164,6 +164,73 @@ def record_fuzzy_corrections(breakdown: list[dict]):
             FUZZY_CORRECTIONS.labels(edit_distance=str(d)).inc()
 
 
+# --- User activity ---
+REQUESTS_BY_USER = Counter(
+    "navi_requests_by_user_total",
+    "Translation requests per user IP",
+    ["user_ip", "input_type"],
+    registry=REGISTRY,
+)
+
+OOV_BY_USER = Counter(
+    "navi_oov_by_user_total",
+    "OOV tokens submitted per user IP — high value = likely gibberish sender",
+    ["user_ip"],
+    registry=REGISTRY,
+)
+
+VOCAB_BY_USER = Counter(
+    "navi_vocab_by_user_total",
+    "Vocabulary contributions per user IP",
+    ["user_ip"],
+    registry=REGISTRY,
+)
+
+# --- Service load ---
+ACTIVE_REQUESTS = Gauge(
+    "navi_active_requests",
+    "Currently in-flight translation requests",
+    registry=REGISTRY,
+)
+
+PROCESS_MEMORY_MB = Gauge(
+    "navi_process_memory_mb",
+    "RSS memory usage of the backend process in MB",
+    registry=REGISTRY,
+)
+
+PROCESS_CPU_PERCENT = Gauge(
+    "navi_process_cpu_percent",
+    "CPU utilisation of the backend process (percent)",
+    registry=REGISTRY,
+)
+
+
+def record_user_request(user_ip: str, input_type: str):
+    REQUESTS_BY_USER.labels(user_ip=user_ip, input_type=input_type).inc()
+
+
+def record_oov_by_user(user_ip: str, count: int = 1):
+    if count > 0:
+        OOV_BY_USER.labels(user_ip=user_ip).inc(count)
+
+
+def record_vocab_by_user(user_ip: str):
+    VOCAB_BY_USER.labels(user_ip=user_ip).inc()
+
+
+def update_process_metrics():
+    """Refresh process-level CPU and memory gauges (call periodically)."""
+    try:
+        import os
+        import psutil
+        proc = psutil.Process(os.getpid())
+        PROCESS_MEMORY_MB.set(proc.memory_info().rss / 1024 / 1024)
+        PROCESS_CPU_PERCENT.set(proc.cpu_percent(interval=None))
+    except Exception:
+        pass
+
+
 def record_oov_words(words: list[str]):
     """Increment OOV counter for each unresolved Na'vi token.
 

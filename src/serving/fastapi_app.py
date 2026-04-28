@@ -19,15 +19,20 @@ from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.monitoring.prometheus_exporter import (
+    ACTIVE_REQUESTS,
     get_metrics,
     record_confidence,
     record_fuzzy_corrections,
+    record_oov_by_user,
     record_oov_words,
     record_translation,
+    record_user_request,
+    record_vocab_by_user,
     record_vocab_submission,
     update_fallback_rate,
     update_model_version,
     update_oov_rate,
+    update_process_metrics,
 )
 from src.serving.inference import TranslationEngine
 from src.serving.schemas import (
@@ -83,11 +88,28 @@ async def startup():
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
-    """Add a unique request_id to every request for traceability."""
+    """Add a unique request_id and track in-flight count for every request."""
     request.state.request_id = str(uuid.uuid4())[:8]
-    response = await call_next(request)
+    # Only count translation endpoints in the active-requests gauge
+    if request.url.path.startswith("/translate"):
+        ACTIVE_REQUESTS.inc()
+        try:
+            response = await call_next(request)
+        finally:
+            ACTIVE_REQUESTS.dec()
+            update_process_metrics()
+    else:
+        response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     return response
+
+
+def _client_ip(request: Request) -> str:
+    """Extract the real client IP, respecting X-Forwarded-For if behind a proxy."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 # --- Translation Endpoints ---
@@ -149,12 +171,16 @@ async def translate_audio(request: Request, file: UploadFile = File(...)):
         confidence = round((asr_confidence + nmt_confidence) / 2, 3)
 
         # Track metrics
+        user_ip = _client_ip(request)
+        oov_tokens = [b["navi"] for b in word_breakdown if not b.get("found")]
         _track_oov(word_breakdown)
         _track_fallback(nmt_confidence < engine.params["marian"]["fallback_confidence_threshold"])
         record_translation("audio", "success", latency_ms)
         record_confidence("audio", confidence)
-        record_oov_words([b["navi"] for b in word_breakdown if not b.get("found")])
+        record_oov_words(oov_tokens)
         record_fuzzy_corrections(word_breakdown)
+        record_user_request(user_ip, "audio")
+        record_oov_by_user(user_ip, len(oov_tokens))
 
         # Reconstruct the corrected Na'vi sentence from breakdown for the UI
         corrected_text = " ".join(b.get("navi_corrected", b["navi"]) for b in word_breakdown)
@@ -207,12 +233,16 @@ async def translate_text(request: Request, body: TextTranslationRequest):
         english, confidence, word_breakdown = engine.translate_text(body.text)
         latency_ms = int((time.time() - start) * 1000)
 
+        user_ip = _client_ip(request)
+        oov_tokens = [b["navi"] for b in word_breakdown if not b.get("found")]
         _track_oov(word_breakdown)
         _track_fallback(confidence < engine.params["marian"]["fallback_confidence_threshold"])
         record_translation("text", "success", latency_ms)
         record_confidence("text", confidence)
-        record_oov_words([b["navi"] for b in word_breakdown if not b.get("found")])
+        record_oov_words(oov_tokens)
         record_fuzzy_corrections(word_breakdown)
+        record_user_request(user_ip, "text")
+        record_oov_by_user(user_ip, len(oov_tokens))
 
         return TextTranslationResponse(
             english=english,
@@ -231,7 +261,7 @@ async def translate_text(request: Request, body: TextTranslationRequest):
 # --- Vocabulary Submission ---
 
 @app.post("/vocab/submit", response_model=VocabSubmissionResponse)
-async def vocab_submit(body: VocabSubmissionRequest):
+async def vocab_submit(request: Request, body: VocabSubmissionRequest):
     """Submit a new Na'vi word with optional audio."""
     # Validate Na'vi character set
     allowed = engine.params["data"]["navi_charset"]
@@ -243,6 +273,7 @@ async def vocab_submit(body: VocabSubmissionRequest):
 
     # Store submission (in production, this would write to data/raw/community/)
     record_vocab_submission()
+    record_vocab_by_user(_client_ip(request))
     logger.info("Vocab submission: %s = %s", body.navi_word, body.english_meaning)
 
     return VocabSubmissionResponse(

@@ -36,4 +36,4 @@ pydantic>=2.5.0
 prometheus-client>=0.20.0
 
 # --- MLOps (runtime tracking only) ---
-mlflow==2.10.2
+mlflow==3.11.1
