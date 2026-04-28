@@ -120,6 +120,34 @@ services:
     depends_on:
       - prometheus
 
+  # ---- Airflow: DAG scheduler + webserver ----
+  airflow:
+    image: apache/airflow:2.9.3
+    container_name: navi-airflow
+    user: "50000:0"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=navi-translator-viva
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow-data:/opt/airflow
+    ports:
+      - "8080:8080"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - >
+        airflow db migrate &&
+        airflow users create -u admin -p admin -f Admin -l User -r Admin -e admin@navi.local 2>/dev/null || true &&
+        airflow webserver -p 8080 &
+        exec airflow scheduler
+    networks:
+      - navi-net
+
 networks:
   navi-net:
     driver: bridge
+
+volumes:
+  airflow-data:
