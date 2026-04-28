@@ -72,3 +72,4 @@ docs/*.toc
 # Local scratch and mock assets
 scratch_*.py
 docs/mock-*.html
+.claude/
